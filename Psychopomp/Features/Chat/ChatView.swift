@@ -37,6 +37,12 @@ struct ChatView: View {
                                       config: config,
                                       context: modelContext)
             await loadModels()
+            // Consume a voice transcript captured via the PTT button on the list screen.
+            let pending = config.pendingVoiceTranscript
+            if !pending.isEmpty {
+                config.pendingVoiceTranscript = ""
+                viewModel?.send(text: pending, images: [])
+            }
         }
         .sheet(item: approvalBinding) { request in
             ApprovalSheet(request: request) { approved in

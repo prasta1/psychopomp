@@ -11,6 +11,8 @@ struct ConversationListView: View {
 
     @State private var path: [Conversation] = []
     @State private var showSettings = false
+    @State private var recorder = VoiceRecorder()
+    @State private var liveTranscript = ""
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -28,9 +30,81 @@ struct ConversationListView: View {
             .sheet(isPresented: $showSettings) {
                 NavigationStack { SettingsView() }
             }
+            .safeAreaInset(edge: .bottom) { pttBar }
+            .onChange(of: recorder.transcript) { _, new in
+                if recorder.isRecording { liveTranscript = new }
+            }
         }
         .tint(Theme.Color.accent)
     }
+
+    // MARK: - PTT Bar
+
+    private var pttBar: some View {
+        VStack(spacing: Theme.Spacing.sm) {
+            if recorder.isRecording && !liveTranscript.isEmpty {
+                Text(liveTranscript)
+                    .font(Theme.Font.caption)
+                    .foregroundStyle(Theme.Color.textSecondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Theme.Spacing.xl)
+                    .transition(.opacity)
+            }
+
+            ZStack {
+                Capsule()
+                    .fill(recorder.isRecording ? Theme.Color.green.opacity(0.15) : Theme.Color.surface)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(
+                                recorder.isRecording ? Theme.Color.green : Theme.Color.border,
+                                lineWidth: 1
+                            )
+                    )
+
+                HStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: recorder.isRecording ? "waveform" : "mic.fill")
+                        .symbolEffect(.variableColor.reversing, options: .repeating, isActive: recorder.isRecording)
+                    Text(recorder.isRecording ? "Listening…" : "Hold to speak")
+                }
+                .font(Theme.Font.callout)
+                .foregroundStyle(recorder.isRecording ? Theme.Color.green : Theme.Color.accent)
+            }
+            .frame(height: 52)
+            .padding(.horizontal, Theme.Spacing.xl)
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in startPTT() }
+                    .onEnded { _ in stopPTT() }
+            )
+        }
+        .padding(.vertical, Theme.Spacing.sm)
+        .background(Theme.Color.bg)
+        .overlay(alignment: .top) { Hairline() }
+        .animation(.easeInOut(duration: 0.2), value: recorder.isRecording)
+    }
+
+    private func startPTT() {
+        guard !recorder.isRecording else { return }
+        liveTranscript = ""
+        Task {
+            let granted = await VoiceRecorder.requestAuthorization()
+            guard granted else { return }
+            try? recorder.start()
+        }
+    }
+
+    private func stopPTT() {
+        let transcript = recorder.stop()
+        let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        liveTranscript = ""
+        guard !trimmed.isEmpty else { return }
+        config.pendingVoiceTranscript = trimmed
+        newConversation()
+    }
+
+    // MARK: - List
 
     private var list: some View {
         List {

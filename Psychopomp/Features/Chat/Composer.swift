@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import PhotosUI
 
-/// The message input bar: text field, image attachment, and a send button that
+/// The message input bar: text field, image attachment, voice recording, and a send button that
 /// becomes a stop button while a run is streaming.
 struct Composer: View {
     @Binding var text: String
@@ -13,6 +13,7 @@ struct Composer: View {
 
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var images: [Data] = []
+    @State private var recorder = VoiceRecorder()
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -35,9 +36,9 @@ struct Composer: View {
                         .foregroundStyle(Theme.Color.textSecondary)
                         .frame(width: 40, height: 40)
                 }
-                .disabled(isStreaming)
+                .disabled(isStreaming || recorder.isRecording)
 
-                TextField("Message Hermes…", text: $text, axis: .vertical)
+                TextField(recorder.isRecording ? "Listening…" : "Message Hermes…", text: $text, axis: .vertical)
                     .focused($focused)
                     .font(Theme.Font.body)
                     .foregroundStyle(Theme.Color.textPrimary)
@@ -49,9 +50,10 @@ struct Composer: View {
                     .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
-                            .strokeBorder(Theme.Color.border, lineWidth: 1)
+                            .strokeBorder(recorder.isRecording ? Theme.Color.green : Theme.Color.border, lineWidth: 1)
                     )
 
+                micButton
                 actionButton
             }
         }
@@ -61,7 +63,40 @@ struct Composer: View {
         .onChange(of: pickerItems) { _, items in
             Task { await load(items) }
         }
+        // Stream live transcript into the text field while recording.
+        .onChange(of: recorder.transcript) { _, new in
+            if recorder.isRecording { text = new }
+        }
     }
+
+    // MARK: - Mic Button
+
+    @ViewBuilder
+    private var micButton: some View {
+        Button {
+            if recorder.isRecording {
+                sendVoice()
+            } else {
+                Task {
+                    let granted = await VoiceRecorder.requestAuthorization()
+                    guard granted else { return }
+                    try? recorder.start()
+                }
+            }
+        } label: {
+            Image(systemName: recorder.isRecording ? "waveform" : "mic")
+                .font(.system(size: 18))
+                .foregroundStyle(recorder.isRecording ? Theme.Color.green : Theme.Color.textSecondary)
+                .frame(width: 40, height: 40)
+                .background(recorder.isRecording ? Theme.Color.green.opacity(0.15) : Color.clear)
+                .clipShape(Circle())
+                .symbolEffect(.variableColor.reversing, options: .repeating, isActive: recorder.isRecording)
+        }
+        .buttonStyle(.plain)
+        .disabled(isStreaming)
+    }
+
+    // MARK: - Send / Stop Button
 
     @ViewBuilder
     private var actionButton: some View {
@@ -77,6 +112,8 @@ struct Composer: View {
             .buttonStyle(.plain)
         } else {
             Button {
+                // If recording, stop it first so the final transcript is captured.
+                if recorder.isRecording { _ = recorder.stop() }
                 let payload = images
                 onSend(payload)
                 images.removeAll()
@@ -95,7 +132,21 @@ struct Composer: View {
     }
 
     private var isActive: Bool {
-        canSend && (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !images.isEmpty)
+        canSend && (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !images.isEmpty || recorder.isRecording)
+    }
+
+    // MARK: - Helpers
+
+    /// Stops voice recording and immediately sends the transcribed text.
+    private func sendVoice() {
+        let final = recorder.stop()
+        let trimmed = final.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty || !images.isEmpty else { return }
+        text = trimmed
+        let payload = images
+        onSend(payload)
+        images.removeAll()
+        pickerItems.removeAll()
     }
 
     private func thumbnail(_ data: Data, index: Int) -> some View {

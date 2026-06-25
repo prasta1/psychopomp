@@ -82,7 +82,7 @@ final class HermesClient {
     // MARK: Streaming a turn
 
     /// Stream a turn. Tries the Runs API first (tool progress, stop, approvals);
-    /// on 404/405/501 falls back to `/v1/chat/completions`.
+    /// on 400/404/405/422/501 falls back to `/v1/chat/completions`.
     func stream(messages: [WireMessage], model: String, sessionKey: String)
         -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
@@ -126,11 +126,20 @@ final class HermesClient {
         let (bytes, response) = try await streamingSession.bytes(for: req)
         guard let http = response as? HTTPURLResponse else { throw HermesError("No HTTP response") }
 
-        if transport == .runs, [404, 405, 501].contains(http.statusCode) {
+        // 400/422 mean the Runs API rejected the request format — fall back to chat/completions.
+        if transport == .runs, [400, 404, 405, 422, 501].contains(http.statusCode) {
             throw TransportUnavailable()
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw HermesError("HTTP \(http.statusCode) from \(path). Check the base URL and API key.")
+            var body = Data()
+            for try await byte in bytes { body.append(byte) }
+            let serverDetail = String(decoding: body, as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .prefix(300)
+            let detail = serverDetail.isEmpty
+                ? "Check the base URL and API key."
+                : String(serverDetail)
+            throw HermesError("HTTP \(http.statusCode) from \(path): \(detail)")
         }
 
         let contentType = (http.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()

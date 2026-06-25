@@ -67,6 +67,7 @@ final class ChatViewModel {
         currentRunId = ""
         let model = config.selectedModel
         let sessionKey = conversation.id.uuidString
+        conversation.model = model  // track which model was used for this turn
 
         streamTask = Task { @MainActor in
             do {

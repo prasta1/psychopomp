@@ -20,6 +20,10 @@ final class HermesConfig {
         }
     }
 
+    /// Transient: voice transcript captured via the PTT button on the list screen.
+    /// Consumed once by the next ChatView that appears.
+    var pendingVoiceTranscript: String = ""
+
     init() {
         self.baseURLString = UserDefaults.standard.string(forKey: Keys.baseURL) ?? ""
         self.selectedModel = UserDefaults.standard.string(forKey: Keys.model) ?? ""

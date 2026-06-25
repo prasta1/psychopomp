@@ -35,14 +35,24 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Speak your message and it will be transcribed and sent to your Hermes agent.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Transcribe your voice messages to send to your Hermes agent.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Attach images from your photo library to send to your Hermes agent.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connect to your Hermes agent running on your local network.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>studio.taile85139.ts.net</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
 	</dict>
 </dict>
 </plist>
