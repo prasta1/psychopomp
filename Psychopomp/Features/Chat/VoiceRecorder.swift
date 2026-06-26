@@ -8,6 +8,8 @@ import Speech
 final class VoiceRecorder {
     private(set) var isRecording = false
     private(set) var transcript = ""
+    /// Smoothed microphone level (0...1) for live UI reactivity (e.g. orb ripples).
+    private(set) var level: Double = 0
 
     private let recognizer: SFSpeechRecognizer?
     private let audioEngine = AVAudioEngine()
@@ -66,6 +68,7 @@ final class VoiceRecorder {
         let format = inputNode.outputFormat(forBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             self?.recognitionRequest?.append(buffer)
+            self?.ingest(buffer)
         }
 
         audioEngine.prepare()
@@ -78,6 +81,7 @@ final class VoiceRecorder {
     func stop() -> String {
         guard isRecording else { return transcript }
         isRecording = false
+        level = 0
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()
@@ -89,6 +93,21 @@ final class VoiceRecorder {
     }
 
     // MARK: - Private
+
+    /// Computes RMS amplitude off the audio thread and smooths it onto the main actor.
+    nonisolated private func ingest(_ buffer: AVAudioPCMBuffer) {
+        guard let channel = buffer.floatChannelData?[0] else { return }
+        let count = Int(buffer.frameLength)
+        guard count > 0 else { return }
+        var sum: Float = 0
+        for i in 0..<count { let s = channel[i]; sum += s * s }
+        let rms = (sum / Float(count)).squareRoot()
+        let normalized = min(1.0, Double(rms) * 12.0)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.level = self.level * 0.7 + normalized * 0.3
+        }
+    }
 
     private func reset() {
         transcript = ""
