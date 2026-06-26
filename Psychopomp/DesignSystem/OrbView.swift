@@ -24,7 +24,7 @@ struct OrbView: View {
     @State private var swirling = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private let diameter: CGFloat = 108
+    private let diameter: CGFloat = 160
 
     var body: some View {
         ZStack {
@@ -33,7 +33,7 @@ struct OrbView: View {
             if state == .thinking { swirlOverlay }
             highlight
         }
-        .frame(width: 140, height: 140)
+        .frame(width: 210, height: 210)
         .scaleEffect(breathScale)
         .animation(breathAnimation, value: breathing)
         .animation(.easeInOut(duration: 0.45), value: state)
@@ -55,8 +55,8 @@ struct OrbView: View {
                 )
             )
             .frame(width: diameter, height: diameter)
-            .shadow(color: glowColor.opacity(glowOpacity), radius: 28)
-            .shadow(color: glowColor.opacity(glowOpacity * 0.5), radius: 64)
+            .shadow(color: glowColor.opacity(glowOpacity), radius: 38)
+            .shadow(color: glowColor.opacity(glowOpacity * 0.5), radius: 84)
     }
 
     private var highlight: some View {
