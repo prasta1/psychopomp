@@ -9,55 +9,40 @@ enum Theme {
 
     // MARK: Color
 
+    /// Active-theme colors. Names are unchanged so all consuming views keep working;
+    /// values now resolve from `ThemeManager.shared.palette`, so switching themes
+    /// re-renders the UI via Observation.
     enum Color {
-        /// App canvas — near black, very slightly warm.
-        static let bg = SwiftUI.Color(hex: 0x0B0B0C)
-        /// Cards, composer, raised rows.
-        static let surface = SwiftUI.Color(hex: 0x161618)
-        /// Raised-on-surface (sheets, code blocks).
-        static let raised = SwiftUI.Color(hex: 0x1E1E21)
-        /// Hairline separators / outlines.
-        static let border = SwiftUI.Color(hex: 0x2A2A2E)
+        static var bg: SwiftUI.Color { ThemeManager.shared.palette.bg }
+        static var canvas: SwiftUI.Color { ThemeManager.shared.palette.canvas }
+        static var canvasTop: SwiftUI.Color { ThemeManager.shared.palette.canvasTop }
+        static var surface: SwiftUI.Color { ThemeManager.shared.palette.surface }
+        static var raised: SwiftUI.Color { ThemeManager.shared.palette.raised }
+        static var border: SwiftUI.Color { ThemeManager.shared.palette.border }
 
-        /// Primary copy — warm off-white.
-        static let textPrimary = SwiftUI.Color(hex: 0xE9E6DF)
-        /// Secondary copy / metadata.
-        static let textSecondary = SwiftUI.Color(hex: 0x9A968C)
-        /// Dim copy / placeholders.
-        static let textDim = SwiftUI.Color(hex: 0x5E5B54)
+        static var textPrimary: SwiftUI.Color { ThemeManager.shared.palette.textPrimary }
+        static var textSecondary: SwiftUI.Color { ThemeManager.shared.palette.textSecondary }
+        static var textDim: SwiftUI.Color { ThemeManager.shared.palette.textDim }
 
-        /// Primary accent — phosphor amber. Cursor, links, send action.
-        static let accent = SwiftUI.Color(hex: 0xCDB089)
-        /// Tool / success.
-        static let green = SwiftUI.Color(hex: 0x7FB89B)
-        /// Errors / destructive / stop.
-        static let red = SwiftUI.Color(hex: 0xC8736B)
+        static var textCool: SwiftUI.Color { ThemeManager.shared.palette.textCool }
+        static var textCoolDim: SwiftUI.Color { ThemeManager.shared.palette.textCoolDim }
+        static var textCoolFaint: SwiftUI.Color { ThemeManager.shared.palette.textCoolFaint }
 
-        // MARK: Ethereal (orb home)
+        static var accent: SwiftUI.Color { ThemeManager.shared.palette.accent }
+        static var aura: SwiftUI.Color { ThemeManager.shared.palette.aura }
+        static var aura2: SwiftUI.Color { ThemeManager.shared.palette.aura2 }
+        static var green: SwiftUI.Color { ThemeManager.shared.palette.green }
+        static var red: SwiftUI.Color { ThemeManager.shared.palette.red }
 
-        /// Deep indigo-black canvas for the orb screen (top of the radial wash).
-        static let canvasTop = SwiftUI.Color(hex: 0x0E1424)
-        /// Deep indigo-black canvas (outer).
-        static let canvas = SwiftUI.Color(hex: 0x070912)
-
-        /// Orb gradient stops: white-blue core → sky → periwinkle → deep core.
-        static let orbHighlight = SwiftUI.Color(hex: 0xEEF9FF)
-        static let orbMid = SwiftUI.Color(hex: 0xACD6FF)
-        static let orbDeep = SwiftUI.Color(hex: 0x6F7CFF)
-        static let orbCore = SwiftUI.Color(hex: 0x241A3A)
-
-        /// Aura / glow + swirl accents.
-        static let aura = SwiftUI.Color(hex: 0x7C96FF)
-        static let aura2 = SwiftUI.Color(hex: 0x9678FF)
-
-        /// Cool text scale for the orb screen.
-        static let textCool = SwiftUI.Color(hex: 0xDCE8FF)
-        static let textCoolDim = SwiftUI.Color(hex: 0x7E8BB5)
-        static let textCoolFaint = SwiftUI.Color(hex: 0x566190)
-
-        /// Desaturated orb for the offline / error state.
-        static let orbOffline = SwiftUI.Color(hex: 0x4A4E63)
+        static var orbHighlight: SwiftUI.Color { ThemeManager.shared.palette.orbHighlight }
+        static var orbMid: SwiftUI.Color { ThemeManager.shared.palette.orbMid }
+        static var orbDeep: SwiftUI.Color { ThemeManager.shared.palette.orbDeep }
+        static var orbCore: SwiftUI.Color { ThemeManager.shared.palette.orbCore }
+        static var orbOffline: SwiftUI.Color { ThemeManager.shared.palette.orbOffline }
     }
+
+    /// The orb render style for the active theme.
+    static var orbStyle: OrbStyle { ThemeManager.shared.palette.orbStyle }
 
     // MARK: Spacing
 
