@@ -151,7 +151,7 @@ final class HermesClient {
             for try await byte in bytes { collected.append(byte) }
             let json = JSON(string: String(decoding: collected, as: UTF8.self))
             let runId = json?["id"].string ?? json?["run_id"].string ?? json?["run"]["id"].string
-            guard let runId else { throw HermesError("Run created but no run id returned.") }
+            guard let runId else { throw TransportUnavailable() }
             yield(.runId(runId))
             try await consumeEvents(runId: runId, sessionKey: sessionKey, yield: yield)
             return

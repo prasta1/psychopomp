@@ -28,9 +28,9 @@ struct ConnectionView: View {
                 }
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    SectionLabel("API key")
+                    SectionLabel("API key (optional)")
                     TerminalField(placeholder: "API_SERVER_KEY", text: $apiKey, isSecure: true)
-                    Text("Stored securely in the iOS Keychain.")
+                    Text("Optional. Leave blank for LM Studio or unauthenticated servers. Stored securely in the iOS Keychain.")
                         .font(Theme.Font.caption)
                         .foregroundStyle(Theme.Color.textDim)
                 }
@@ -88,7 +88,7 @@ struct ConnectionView: View {
     }
 
     private var canConnect: Bool {
-        config.normalizedFrom(baseURL) != nil && !apiKey.trimmingCharacters(in: .whitespaces).isEmpty
+        config.normalizedFrom(baseURL) != nil
     }
 
     private func persist() {

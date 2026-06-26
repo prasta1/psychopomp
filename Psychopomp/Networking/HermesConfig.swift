@@ -26,13 +26,13 @@ final class HermesConfig {
 
     init() {
         self.baseURLString = UserDefaults.standard.string(forKey: Keys.baseURL) ?? ""
-        self.selectedModel = UserDefaults.standard.string(forKey: Keys.model) ?? ""
+        self.selectedModel = UserDefaults.standard.string(forKey: Keys.model) ?? "nousresearch/hermes-4-70b"
         self.apiKey = Keychain.read() ?? ""
     }
 
     /// Whether enough is configured to attempt a connection.
     var isConfigured: Bool {
-        normalizedBaseURL != nil && !apiKey.isEmpty
+        normalizedBaseURL != nil
     }
 
     /// Trim trailing slashes and validate.
