@@ -1,6 +1,8 @@
 import SwiftUI
+import UIKit
 
 /// Edit the connection, re-run the health check, change the default model.
+/// Styled to match the ethereal orb home (indigo wash, cool text, aura accents).
 struct SettingsView: View {
     @Environment(HermesConfig.self) private var config
     @Environment(\.dismiss) private var dismiss
@@ -15,38 +17,37 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                 group("Server URL") {
-                    TerminalField(placeholder: "http://127.0.0.1:8642", text: $baseURL, keyboard: .URL)
+                    field("http://127.0.0.1:8642", text: $baseURL, keyboard: .URL)
                 }
                 group("API key") {
-                    TerminalField(placeholder: "API_SERVER_KEY", text: $apiKey, isSecure: true)
+                    field("API_SERVER_KEY", text: $apiKey, secure: true)
                 }
                 group("Default model") {
                     if models.isEmpty {
                         Text(config.selectedModel.isEmpty ? "Reload to fetch models" : config.selectedModel)
-                            .font(Theme.Font.body)
-                            .foregroundStyle(Theme.Color.textSecondary)
+                            .font(Theme.Font.sansBody)
+                            .foregroundStyle(Theme.Color.textCoolDim)
                     } else {
                         Picker("Model", selection: modelSelection) {
                             ForEach(models) { Text($0.id).tag($0.id) }
                         }
                         .pickerStyle(.menu)
-                        .tint(Theme.Color.accent)
+                        .tint(Theme.Color.aura)
                     }
                 }
 
                 if let status {
                     Label(status, systemImage: statusOK ? "checkmark.circle" : "exclamationmark.triangle")
-                        .font(Theme.Font.caption)
+                        .font(Theme.Font.sansCaption)
                         .foregroundStyle(statusOK ? Theme.Color.green : Theme.Color.red)
                 }
 
                 VStack(spacing: Theme.Spacing.md) {
-                    TerminalButton(title: "Test & reload models", systemImage: "arrow.clockwise", kind: .secondary) {
+                    secondaryButton("Test & reload models", system: "arrow.clockwise") {
                         Task { await reload() }
                     }
-                    TerminalButton(title: "Save", systemImage: "checkmark") {
-                        persist()
-                        dismiss()
+                    primaryButton("Save", system: "checkmark") {
+                        persist(); dismiss()
                     }
                 }
 
@@ -54,12 +55,15 @@ struct SettingsView: View {
             }
             .padding(Theme.Spacing.xl)
         }
-        .screenBackground()
+        .orbBackground()
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Theme.Color.canvas, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Done") { persist(); dismiss() }.tint(Theme.Color.accent)
+                Button("Done") { persist(); dismiss() }.tint(Theme.Color.aura)
             }
         }
         .onAppear {
@@ -69,22 +73,84 @@ struct SettingsView: View {
         .task { await reload() }
     }
 
+    // MARK: - Ethereal building blocks
+
+    @ViewBuilder
     private func group<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            SectionLabel(label)
+            Text(label.uppercased())
+                .font(Theme.Font.sansCaption)
+                .foregroundStyle(Theme.Color.textCoolFaint)
+                .tracking(1.2)
             content()
         }
     }
 
+    @ViewBuilder
+    private func field(_ placeholder: String, text: Binding<String>, secure: Bool = false,
+                       keyboard: UIKeyboardType = .default) -> some View {
+        Group {
+            if secure { SecureField(placeholder, text: text) }
+            else { TextField(placeholder, text: text) }
+        }
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+        .keyboardType(keyboard)
+        .font(Theme.Font.sansBody)
+        .foregroundStyle(Theme.Color.textCool)
+        .tint(Theme.Color.aura)
+        .padding(Theme.Spacing.md)
+        .background(Color.white.opacity(0.05),
+                    in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .strokeBorder(Theme.Color.textCoolFaint.opacity(0.5), lineWidth: 1)
+        )
+    }
+
+    private func primaryButton(_ title: String, system: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            buttonLabel(title, system: system)
+                .foregroundStyle(Theme.Color.canvas)
+                .background(Theme.Color.aura,
+                            in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func secondaryButton(_ title: String, system: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            buttonLabel(title, system: system)
+                .foregroundStyle(Theme.Color.textCool)
+                .background(Color.white.opacity(0.06),
+                            in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                        .strokeBorder(Theme.Color.aura.opacity(0.35), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func buttonLabel(_ title: String, system: String) -> some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: system)
+            Text(title)
+        }
+        .font(Theme.Font.sansBody.weight(.semibold))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.Spacing.md)
+    }
+
     private var aboutFooter: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            Hairline().opacity(0.5)
+            Rectangle().fill(Theme.Color.textCoolFaint.opacity(0.3)).frame(height: 1)
             Text("psychopomp · Hermes agent companion")
-                .font(Theme.Font.caption)
-                .foregroundStyle(Theme.Color.textDim)
+                .font(Theme.Font.sansCaption)
+                .foregroundStyle(Theme.Color.textCoolFaint)
             Text("Sessions and history are stored on this device.")
-                .font(Theme.Font.caption)
-                .foregroundStyle(Theme.Color.textDim)
+                .font(Theme.Font.sansCaption)
+                .foregroundStyle(Theme.Color.textCoolFaint)
         }
         .padding(.top, Theme.Spacing.md)
     }
