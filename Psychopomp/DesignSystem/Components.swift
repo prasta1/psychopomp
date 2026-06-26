@@ -117,4 +117,17 @@ extension View {
     func screenBackground() -> some View {
         self.background(Theme.Color.bg.ignoresSafeArea())
     }
+
+    /// The deep-indigo radial wash used by the orb home.
+    func orbBackground() -> some View {
+        self.background(
+            RadialGradient(
+                colors: [Theme.Color.canvasTop, Theme.Color.canvas],
+                center: UnitPoint(x: 0.5, y: 0.28),
+                startRadius: 0,
+                endRadius: 600
+            )
+            .ignoresSafeArea()
+        )
+    }
 }

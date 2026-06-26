@@ -32,6 +32,31 @@ enum Theme {
         static let green = SwiftUI.Color(hex: 0x7FB89B)
         /// Errors / destructive / stop.
         static let red = SwiftUI.Color(hex: 0xC8736B)
+
+        // MARK: Ethereal (orb home)
+
+        /// Deep indigo-black canvas for the orb screen (top of the radial wash).
+        static let canvasTop = SwiftUI.Color(hex: 0x0E1424)
+        /// Deep indigo-black canvas (outer).
+        static let canvas = SwiftUI.Color(hex: 0x070912)
+
+        /// Orb gradient stops: white-blue core → sky → periwinkle → deep core.
+        static let orbHighlight = SwiftUI.Color(hex: 0xEEF9FF)
+        static let orbMid = SwiftUI.Color(hex: 0xACD6FF)
+        static let orbDeep = SwiftUI.Color(hex: 0x6F7CFF)
+        static let orbCore = SwiftUI.Color(hex: 0x241A3A)
+
+        /// Aura / glow + swirl accents.
+        static let aura = SwiftUI.Color(hex: 0x7C96FF)
+        static let aura2 = SwiftUI.Color(hex: 0x9678FF)
+
+        /// Cool text scale for the orb screen.
+        static let textCool = SwiftUI.Color(hex: 0xDCE8FF)
+        static let textCoolDim = SwiftUI.Color(hex: 0x7E8BB5)
+        static let textCoolFaint = SwiftUI.Color(hex: 0x566190)
+
+        /// Desaturated orb for the offline / error state.
+        static let orbOffline = SwiftUI.Color(hex: 0x4A4E63)
     }
 
     // MARK: Spacing
@@ -62,6 +87,11 @@ enum Theme {
         static let callout = SwiftUI.Font.system(.callout, design: .monospaced)
         static let caption = SwiftUI.Font.system(.caption, design: .monospaced)
         static let code = SwiftUI.Font.system(.callout, design: .monospaced)
+
+        // Soft sans for the orb home (a calmer counterpoint to the mono UI).
+        static let sansTitle = SwiftUI.Font.system(.title3, design: .default).weight(.medium)
+        static let sansBody = SwiftUI.Font.system(.body, design: .default)
+        static let sansCaption = SwiftUI.Font.system(.caption, design: .default)
     }
 }
 
