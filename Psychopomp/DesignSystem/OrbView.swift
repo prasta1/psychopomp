@@ -65,14 +65,30 @@ struct OrbView: View {
             .fill(
                 RadialGradient(
                     colors: coreColors,
-                    center: UnitPoint(x: 0.48, y: 0.34),
+                    center: UnitPoint(x: isJewel ? 0.40 : 0.48, y: isJewel ? 0.30 : 0.34),
                     startRadius: 2,
                     endRadius: diameter * 0.85
                 )
             )
             .frame(width: diameter, height: diameter)
-            .shadow(color: glowColor.opacity(glowOpacity), radius: 38)
-            .shadow(color: glowColor.opacity(glowOpacity * 0.5), radius: 84)
+            .overlay { if isJewel { jewelRim } }
+            .shadow(color: primaryShadow.color, radius: primaryShadow.radius, y: primaryShadow.y)
+            .shadow(color: secondaryShadow.color, radius: secondaryShadow.radius, y: secondaryShadow.y)
+    }
+
+    /// Darkened rim that gives the jewel a convex, polished-stone depth.
+    private var jewelRim: some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [.clear, .clear, .black.opacity(0.45)],
+                    center: .center,
+                    startRadius: diameter * 0.18,
+                    endRadius: diameter * 0.5
+                )
+            )
+            .frame(width: diameter, height: diameter)
+            .blendMode(.multiply)
     }
 
     private var highlight: some View {
@@ -86,6 +102,19 @@ struct OrbView: View {
                 )
             )
             .frame(width: diameter, height: diameter)
+    }
+
+    /// Whether the active theme wants the dark-jewel render instead of the glow.
+    private var isJewel: Bool { Theme.orbStyle == .jewel }
+
+    /// Outer shadow pair: a soft aura bloom for glow themes, a grounding drop
+    /// shadow for jewel themes.
+    private var primaryShadow: (color: Color, radius: CGFloat, y: CGFloat) {
+        isJewel ? (.black.opacity(0.35), 18, 12) : (glowColor.opacity(glowOpacity), 38, 0)
+    }
+
+    private var secondaryShadow: (color: Color, radius: CGFloat, y: CGFloat) {
+        isJewel ? (.black.opacity(0.18), 40, 22) : (glowColor.opacity(glowOpacity * 0.5), 84, 0)
     }
 
     private var swirlOverlay: some View {
@@ -198,7 +227,7 @@ private struct Ripple: View {
     }
 }
 
-#Preview("Orb states") {
+#Preview("Orb states · Ethereal") {
     VStack(spacing: 40) {
         HStack(spacing: 40) {
             OrbView(state: .idle)
@@ -209,6 +238,22 @@ private struct Ripple: View {
             OrbView(state: .speaking)
         }
         OrbView(state: .offline)
+    }
+    .padding(40)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .orbBackground()
+}
+
+#Preview("Orb jewel · Catppuccin Latte") {
+    // Sets the shared theme for this preview process so the jewel render + light
+    // canvas show. (Previews share the singleton; open one at a time.)
+    ThemeManager.shared.selected = .catppuccinLatte
+    return VStack(spacing: 40) {
+        HStack(spacing: 40) {
+            OrbView(state: .idle)
+            OrbView(state: .listening, audioLevel: 0.8)
+        }
+        OrbView(state: .speaking)
     }
     .padding(40)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
