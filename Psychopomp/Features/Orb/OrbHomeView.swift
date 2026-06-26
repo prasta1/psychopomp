@@ -1,0 +1,366 @@
+import SwiftUI
+import SwiftData
+
+/// The orb home — the app's primary surface. Hold the orb to talk (release to send),
+/// or tap to latch hands-free listening. The agent's reply streams as text below it.
+/// History, the full transcript, and the keyboard remain reachable.
+struct OrbHomeView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(HermesConfig.self) private var config
+
+    /// The conversation the orb is currently bound to (continued across turns).
+    @State private var conversation: Conversation?
+    @State private var viewModel: ChatViewModel?
+    @State private var recorder = VoiceRecorder()
+
+    @State private var path: [Conversation] = []
+    @State private var liveTranscript = ""
+    @State private var isLocked = false
+    @State private var pressStartedAt: Date?
+    @State private var permissionDenied = false
+    @State private var showRecent = false
+    @State private var showSettings = false
+    @State private var showKeyboard = false
+    @State private var keyboardDraft = ""
+    @State private var models: [HermesModelInfo] = []
+
+    /// Below which a press counts as a "tap" (latch) rather than a "hold" (send).
+    private let tapThreshold: TimeInterval = 0.4
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            ZStack {
+                orbStage
+                chrome
+            }
+            .orbBackground()
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: Conversation.self) { ChatView(conversation: $0) }
+            .sheet(isPresented: $showRecent) {
+                RecentSessionsSheet(
+                    current: conversation,
+                    onSelect: { select($0) },
+                    onOpen: { showRecent = false; path.append($0) },
+                    onNew: { startNewSession() }
+                )
+            }
+            .sheet(isPresented: $showSettings) {
+                NavigationStack { SettingsView() }
+            }
+            .task { await loadModels() }
+            .onChange(of: recorder.transcript) { _, new in
+                if recorder.isRecording { liveTranscript = new }
+            }
+        }
+        .tint(Theme.Color.aura)
+    }
+
+    // MARK: - Orb + current turn
+
+    private var orbStage: some View {
+        VStack(spacing: Theme.Spacing.xl) {
+            Spacer(minLength: 0)
+            OrbView(state: orbState, audioLevel: recorder.level)
+                .contentShape(Circle())
+                .gesture(orbGesture)
+            caption
+            replyArea
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Theme.Spacing.xl)
+        .padding(.bottom, 96)
+    }
+
+    private var caption: some View {
+        VStack(spacing: Theme.Spacing.xs) {
+            Text(captionText)
+                .font(Theme.Font.sansTitle)
+                .foregroundStyle(Theme.Color.textCool)
+            if orbState == .idle {
+                Text("tap to lock hands-free")
+                    .font(Theme.Font.sansCaption)
+                    .foregroundStyle(Theme.Color.textCoolFaint)
+            }
+            if permissionDenied {
+                Text("Microphone access is off — enable it in Settings, or use the keyboard.")
+                    .font(Theme.Font.sansCaption)
+                    .foregroundStyle(Theme.Color.red)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: orbState)
+    }
+
+    @ViewBuilder
+    private var replyArea: some View {
+        if recorder.isRecording, !liveTranscript.isEmpty {
+            Text(liveTranscript)
+                .font(Theme.Font.sansBody)
+                .foregroundStyle(Theme.Color.textCoolDim)
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .transition(.opacity)
+        } else if let assistant = latestAssistant, !assistant.text.isEmpty, let convo = conversation {
+            Button { path.append(convo) } label: {
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    Text(assistant.text)
+                        .font(Theme.Font.sansBody)
+                        .foregroundStyle(Theme.Color.textCool)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(8)
+                    ForEach(assistant.orderedToolEvents) { event in
+                        toolChip(event)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func toolChip(_ event: ToolEvent) -> some View {
+        Text("\u{25B7} \(event.name)\(event.detail.isEmpty ? "" : " \u{00B7} \(event.detail)")")
+            .font(Theme.Font.caption)
+            .foregroundStyle(Theme.Color.aura)
+            .lineLimit(1)
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, 3)
+            .background(Theme.Color.aura.opacity(0.12), in: Capsule())
+    }
+
+    // MARK: - Chrome (status, settings, keyboard, stop, recent)
+
+    private var chrome: some View {
+        VStack {
+            HStack {
+                statusBadge
+                Spacer()
+                Button { showSettings = true } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 18))
+                        .foregroundStyle(Theme.Color.textCoolDim)
+                }
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.sm)
+
+            Spacer()
+
+            if showKeyboard { keyboardBar }
+            bottomDock
+        }
+    }
+
+    private var statusBadge: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(config.isConfigured ? Theme.Color.green : Theme.Color.red)
+                .frame(width: 7, height: 7)
+            Text(config.selectedModel.isEmpty ? "no model" : shortModel)
+                .font(Theme.Font.sansCaption)
+                .foregroundStyle(Theme.Color.textCoolDim)
+        }
+    }
+
+    private var bottomDock: some View {
+        ZStack {
+            // History grabber (swipe up / tap).
+            VStack(spacing: 6) {
+                Capsule().fill(Theme.Color.textCoolFaint).frame(width: 38, height: 4)
+                Text("Recent sessions")
+                    .font(Theme.Font.sansCaption)
+                    .foregroundStyle(Theme.Color.textCoolDim)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { showRecent = true }
+            .gesture(
+                DragGesture(minimumDistance: 10)
+                    .onEnded { if $0.translation.height < -20 { showRecent = true } }
+            )
+
+            HStack {
+                if viewModel?.isStreaming == true {
+                    iconButton("stop.fill", tint: Theme.Color.red) { viewModel?.stop() }
+                } else {
+                    Color.clear.frame(width: 38, height: 38)
+                }
+                Spacer()
+                iconButton("keyboard", tint: Theme.Color.aura) {
+                    permissionDenied = false
+                    showKeyboard.toggle()
+                }
+            }
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.bottom, Theme.Spacing.lg)
+    }
+
+    private var keyboardBar: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            TextField("Type to Hermes…", text: $keyboardDraft, axis: .vertical)
+                .font(Theme.Font.sansBody)
+                .foregroundStyle(Theme.Color.textCool)
+                .tint(Theme.Color.aura)
+                .lineLimit(1...4)
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.vertical, Theme.Spacing.sm)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+            Button {
+                sendText(keyboardDraft)
+                keyboardDraft = ""
+                showKeyboard = false
+            } label: {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Theme.Color.canvas)
+                    .frame(width: 40, height: 40)
+                    .background(canSendText ? Theme.Color.aura : Theme.Color.border, in: Circle())
+            }
+            .disabled(!canSendText)
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.bottom, Theme.Spacing.sm)
+    }
+
+    private func iconButton(_ system: String, tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: system)
+                .font(.system(size: 16))
+                .foregroundStyle(tint)
+                .frame(width: 38, height: 38)
+                .background(tint.opacity(0.12), in: Circle())
+        }
+    }
+
+    // MARK: - State mapping
+
+    private var orbState: OrbState {
+        if !config.isConfigured { return .offline }
+        if recorder.isRecording { return .listening }
+        if viewModel?.isStreaming == true {
+            return (latestAssistant?.text.isEmpty == false) ? .speaking : .thinking
+        }
+        return .idle
+    }
+
+    private var captionText: String {
+        switch orbState {
+        case .idle: return "Hold to speak"
+        case .listening: return isLocked ? "Listening — tap to send" : "Listening…"
+        case .thinking: return "Thinking…"
+        case .speaking: return "Hermes"
+        case .offline: return "Tap settings to connect"
+        }
+    }
+
+    private var latestAssistant: ChatMessage? {
+        conversation?.orderedMessages.last(where: { $0.role == .assistant })
+    }
+
+    private var canSendText: Bool {
+        !keyboardDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var shortModel: String {
+        let id = config.selectedModel
+        return id.count > 16 ? "…" + id.suffix(14) : id
+    }
+
+    // MARK: - Gesture (hold OR tap-lock)
+
+    private var orbGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in if pressStartedAt == nil { handlePressDown() } }
+            .onEnded { _ in handlePressUp() }
+    }
+
+    private func handlePressDown() {
+        pressStartedAt = Date()
+        if isLocked { return }          // a press while locked resolves on release (stop & send)
+        startListening()
+    }
+
+    private func handlePressUp() {
+        let held = Date().timeIntervalSince(pressStartedAt ?? Date())
+        pressStartedAt = nil
+        if isLocked {
+            isLocked = false
+            stopAndSend()
+            return
+        }
+        if held < tapThreshold {
+            isLocked = true             // quick tap → latch hands-free; keep recording
+        } else {
+            stopAndSend()               // hold-release → send
+        }
+    }
+
+    // MARK: - Voice + send
+
+    private func startListening() {
+        guard !recorder.isRecording else { return }
+        liveTranscript = ""
+        Task {
+            let granted = await VoiceRecorder.requestAuthorization()
+            guard granted else { permissionDenied = true; isLocked = false; return }
+            try? recorder.start()
+        }
+    }
+
+    private func stopAndSend() {
+        let final = recorder.stop().trimmingCharacters(in: .whitespacesAndNewlines)
+        liveTranscript = ""
+        guard !final.isEmpty else { return }
+        sendText(final)
+    }
+
+    private func sendText(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        ensureConversation()
+        viewModel?.send(text: trimmed, images: [])
+    }
+
+    // MARK: - Session management
+
+    private func ensureConversation() {
+        if conversation == nil {
+            let convo = Conversation(model: config.selectedModel)
+            modelContext.insert(convo)
+            try? modelContext.save()
+            conversation = convo
+        }
+        if viewModel == nil, let convo = conversation {
+            viewModel = ChatViewModel(conversation: convo,
+                                      client: HermesClient(config: config),
+                                      config: config,
+                                      context: modelContext)
+        }
+    }
+
+    private func startNewSession() {
+        showRecent = false
+        conversation = nil
+        viewModel = nil
+        ensureConversation()
+    }
+
+    private func select(_ convo: Conversation) {
+        showRecent = false
+        conversation = convo
+        viewModel = ChatViewModel(conversation: convo,
+                                  client: HermesClient(config: config),
+                                  config: config,
+                                  context: modelContext)
+    }
+
+    private func loadModels() async {
+        let client = HermesClient(config: config)
+        if let fetched = try? await client.listModels(), !fetched.isEmpty {
+            models = fetched
+            if config.selectedModel.isEmpty || !fetched.contains(where: { $0.id == config.selectedModel }) {
+                config.selectedModel = fetched.first!.id
+            }
+        }
+    }
+}

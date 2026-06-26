@@ -36,7 +36,7 @@ struct RootView: View {
     var body: some View {
         Group {
             if config.isConfigured || connected {
-                ConversationListView()
+                OrbHomeView()
             } else {
                 ConnectionView { connected = true }
             }
