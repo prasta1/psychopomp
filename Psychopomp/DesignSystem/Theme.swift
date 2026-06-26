@@ -96,8 +96,9 @@ enum Theme {
 }
 
 extension Color {
-    /// Build a color from a 0xRRGGBB literal.
-    init(hex: UInt32, alpha: Double = 1.0) {
+    /// Build a color from a 0xRRGGBB literal. Takes `Int` (the default integer
+    /// literal type) so large palette initializers type-check fast.
+    init(hex: Int, alpha: Double = 1.0) {
         let r = Double((hex >> 16) & 0xFF) / 255.0
         let g = Double((hex >> 8) & 0xFF) / 255.0
         let b = Double(hex & 0xFF) / 255.0
