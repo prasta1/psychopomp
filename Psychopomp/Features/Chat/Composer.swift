@@ -80,7 +80,7 @@ struct Composer: View {
                 Task {
                     let granted = await VoiceRecorder.requestAuthorization()
                     guard granted else { return }
-                    try? recorder.start()
+                    try? await recorder.start()
                 }
             }
         } label: {

@@ -23,17 +23,26 @@ struct OrbHomeView: View {
     @State private var showKeyboard = false
     @State private var keyboardDraft = ""
     @State private var models: [HermesModelInfo] = []
+    /// Whether the last model fetch actually reached the server (drives the status dot).
+    @State private var reachable = false
+    @FocusState private var typing: Bool
+    /// Icon-button sizes that grow with Dynamic Type so glyphs and hit-targets scale together.
+    @ScaledMetric private var iconButtonSize: CGFloat = 38
+    @ScaledMetric private var sendButtonSize: CGFloat = 40
 
     /// Below which a press counts as a "tap" (latch) rather than a "hold" (send).
     private let tapThreshold: TimeInterval = 0.4
 
     var body: some View {
         NavigationStack(path: $path) {
-            ZStack {
+            ZStack(alignment: .top) {
                 orbStage
-                chrome
+                topBar
             }
             .orbBackground()
+            .safeAreaInset(edge: .bottom) { bottomBar }
+            .sensoryFeedback(.impact(weight: .medium), trigger: recorder.isRecording)
+            .sensoryFeedback(.selection, trigger: isLocked)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Conversation.self) { ChatView(conversation: $0) }
             .sheet(isPresented: $showRecent) {
@@ -63,12 +72,16 @@ struct OrbHomeView: View {
             OrbView(state: orbState, audioLevel: recorder.level)
                 .contentShape(Circle())
                 .gesture(orbGesture)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint(recorder.isRecording
+                    ? "Double-tap to send"
+                    : "Double-tap to talk, then double-tap again to send")
+                .accessibilityAction { toggleTalkForAccessibility() }
             caption
             replyArea
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Theme.Spacing.xl)
-        .padding(.bottom, 96)
     }
 
     private var caption: some View {
@@ -86,6 +99,12 @@ struct OrbHomeView: View {
                     .font(Theme.Font.sansCaption)
                     .foregroundStyle(Theme.Color.red)
                     .multilineTextAlignment(.center)
+            } else if let error = viewModel?.errorMessage {
+                Text(error)
+                    .font(Theme.Font.sansCaption)
+                    .foregroundStyle(Theme.Color.red)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: orbState)
@@ -130,22 +149,23 @@ struct OrbHomeView: View {
 
     // MARK: - Chrome (status, settings, keyboard, stop, recent)
 
-    private var chrome: some View {
-        VStack {
-            HStack {
-                statusBadge
-                Spacer()
-                Button { showSettings = true } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 18))
-                        .foregroundStyle(Theme.Color.textCoolDim)
-                }
-            }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.top, Theme.Spacing.sm)
-
+    private var topBar: some View {
+        HStack {
+            statusBadge
             Spacer()
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape")
+                    .font(.title3)
+                    .foregroundStyle(Theme.Color.textCoolDim)
+            }
+            .accessibilityLabel("Settings")
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.top, Theme.Spacing.sm)
+    }
 
+    private var bottomBar: some View {
+        VStack(spacing: 0) {
             if showKeyboard { keyboardBar }
             bottomDock
         }
@@ -154,12 +174,21 @@ struct OrbHomeView: View {
     private var statusBadge: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(config.isConfigured ? Theme.Color.green : Theme.Color.red)
+                .fill(dotColor)
                 .frame(width: 7, height: 7)
             Text(config.selectedModel.isEmpty ? "no model" : shortModel)
                 .font(Theme.Font.sansCaption)
                 .foregroundStyle(Theme.Color.textCoolDim)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(reachable ? "Connected. Model \(config.selectedModel)." : "Not connected.")
+    }
+
+    /// Green only when a live model fetch succeeded; neutral when configured but
+    /// unconfirmed; red when there's no usable connection at all.
+    private var dotColor: Color {
+        if !config.isConfigured { return Theme.Color.red }
+        return reachable ? Theme.Color.green : Theme.Color.textCoolFaint
     }
 
     private var bottomDock: some View {
@@ -181,14 +210,17 @@ struct OrbHomeView: View {
             HStack {
                 if viewModel?.isStreaming == true {
                     iconButton("stop.fill", tint: Theme.Color.red) { viewModel?.stop() }
+                        .accessibilityLabel("Stop")
                 } else {
-                    Color.clear.frame(width: 38, height: 38)
+                    Color.clear.frame(width: iconButtonSize, height: iconButtonSize)
                 }
                 Spacer()
                 iconButton("keyboard", tint: Theme.Color.aura) {
                     permissionDenied = false
                     showKeyboard.toggle()
+                    typing = showKeyboard
                 }
+                .accessibilityLabel("Type a message")
             }
         }
         .padding(.horizontal, Theme.Spacing.lg)
@@ -198,6 +230,7 @@ struct OrbHomeView: View {
     private var keyboardBar: some View {
         HStack(spacing: Theme.Spacing.sm) {
             TextField("Type to Hermes…", text: $keyboardDraft, axis: .vertical)
+                .focused($typing)
                 .font(Theme.Font.sansBody)
                 .foregroundStyle(Theme.Color.textCool)
                 .tint(Theme.Color.aura)
@@ -211,9 +244,9 @@ struct OrbHomeView: View {
                 showKeyboard = false
             } label: {
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.title3.weight(.bold))
                     .foregroundStyle(Theme.Color.canvas)
-                    .frame(width: 40, height: 40)
+                    .frame(width: sendButtonSize, height: sendButtonSize)
                     .background(canSendText ? Theme.Color.aura : Theme.Color.border, in: Circle())
             }
             .disabled(!canSendText)
@@ -225,9 +258,9 @@ struct OrbHomeView: View {
     private func iconButton(_ system: String, tint: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: system)
-                .font(.system(size: 16))
+                .font(.title3)
                 .foregroundStyle(tint)
-                .frame(width: 38, height: 38)
+                .frame(width: iconButtonSize, height: iconButtonSize)
                 .background(tint.opacity(0.12), in: Circle())
         }
     }
@@ -245,7 +278,7 @@ struct OrbHomeView: View {
 
     private var captionText: String {
         switch orbState {
-        case .idle: return "Hold to speak"
+        case .idle: return "Talk to Me Heath"
         case .listening: return isLocked ? "Listening — tap to send" : "Listening…"
         case .thinking: return "Thinking…"
         case .speaking: return "Hermes"
@@ -295,6 +328,18 @@ struct OrbHomeView: View {
         }
     }
 
+    /// VoiceOver / Switch Control entry point — the press-and-hold gesture isn't
+    /// operable without sight, so expose a double-tap toggle: talk, then send.
+    private func toggleTalkForAccessibility() {
+        if recorder.isRecording {
+            isLocked = false
+            stopAndSend()
+        } else {
+            isLocked = true
+            startListening()
+        }
+    }
+
     // MARK: - Voice + send
 
     private func startListening() {
@@ -303,7 +348,7 @@ struct OrbHomeView: View {
         Task {
             let granted = await VoiceRecorder.requestAuthorization()
             guard granted else { permissionDenied = true; isLocked = false; return }
-            try? recorder.start()
+            try? await recorder.start()
         }
     }
 
@@ -358,9 +403,12 @@ struct OrbHomeView: View {
         let client = HermesClient(config: config)
         if let fetched = try? await client.listModels(), !fetched.isEmpty {
             models = fetched
+            reachable = true
             if config.selectedModel.isEmpty || !fetched.contains(where: { $0.id == config.selectedModel }) {
                 config.selectedModel = fetched.first!.id
             }
+        } else {
+            reachable = false
         }
     }
 }

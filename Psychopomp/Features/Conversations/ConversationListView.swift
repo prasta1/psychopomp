@@ -66,7 +66,7 @@ struct ConversationListView: View {
                 HStack(spacing: Theme.Spacing.sm) {
                     Image(systemName: recorder.isRecording ? "waveform" : "mic.fill")
                         .symbolEffect(.variableColor.reversing, options: .repeating, isActive: recorder.isRecording)
-                    Text(recorder.isRecording ? "Listening…" : "Hold to speak")
+                    Text(recorder.isRecording ? "Listening…" : "Talk to Me Heath")
                 }
                 .font(Theme.Font.callout)
                 .foregroundStyle(recorder.isRecording ? Theme.Color.green : Theme.Color.accent)
@@ -91,7 +91,7 @@ struct ConversationListView: View {
         Task {
             let granted = await VoiceRecorder.requestAuthorization()
             guard granted else { return }
-            try? recorder.start()
+            try? await recorder.start()
         }
     }
 

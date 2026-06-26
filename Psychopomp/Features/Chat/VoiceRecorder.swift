@@ -38,13 +38,11 @@ final class VoiceRecorder {
     // MARK: - Recording
 
     /// Starts live speech recognition. Interim results are streamed into `transcript`.
-    func start() throws {
+    func start() async throws {
         guard let recognizer, recognizer.isAvailable else { return }
         reset()
 
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .measurement, options: .duckOthers)
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
+        try await activateAudioSession()
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -88,7 +86,9 @@ final class VoiceRecorder {
         recognitionRequest = nil
         recognitionTask?.cancel()
         recognitionTask = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        Task.detached {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
         return transcript
     }
 
@@ -107,6 +107,13 @@ final class VoiceRecorder {
             guard let self else { return }
             self.level = self.level * 0.7 + normalized * 0.3
         }
+    }
+
+    /// Configures and activates the audio session off the main actor to avoid blocking the UI.
+    nonisolated private func activateAudioSession() async throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+        try session.setActive(true, options: .notifyOthersOnDeactivation)
     }
 
     private func reset() {

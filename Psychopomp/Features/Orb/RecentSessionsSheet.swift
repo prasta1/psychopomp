@@ -71,6 +71,7 @@ struct RecentSessionsSheet: View {
                     .foregroundStyle(Theme.Color.textCoolDim)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Open full transcript")
         }
         .padding(.vertical, Theme.Spacing.xs)
     }

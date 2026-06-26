@@ -20,13 +20,34 @@ struct OrbView: View {
     /// Live mic level 0...1; intensifies ripples while `.listening`.
     var audioLevel: Double = 0
 
-    @State private var breathing = false
     @State private var swirling = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let diameter: CGFloat = 160
 
     var body: some View {
+        Group {
+            if reduceMotion || state == .offline {
+                // Hold still for Reduce Motion and when there's nothing to convey.
+                layers
+            } else {
+                // PhaseAnimator drives a continuous breath whose speed re-times
+                // whenever `state` changes (trigger), unlike a one-shot repeatForever.
+                PhaseAnimator([false, true], trigger: state) { expanded in
+                    layers.scaleEffect(breathScale(expanded))
+                } animation: { _ in
+                    .easeInOut(duration: breathDuration)
+                }
+            }
+        }
+        .onAppear { swirling = true }
+        .accessibilityElement()
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    /// The static visual stack. Breath/scale is applied by the PhaseAnimator above;
+    /// glow and color changes cross-fade on state transitions.
+    private var layers: some View {
         ZStack {
             if state == .listening { ripples }
             coreBase
@@ -34,12 +55,7 @@ struct OrbView: View {
             highlight
         }
         .frame(width: 210, height: 210)
-        .scaleEffect(breathScale)
-        .animation(breathAnimation, value: breathing)
-        .animation(.easeInOut(duration: 0.45), value: state)
-        .onAppear { breathing = true; swirling = true }
-        .accessibilityElement()
-        .accessibilityLabel(accessibilityLabel)
+        .animation(.easeInOut(duration: 0.4), value: state)
     }
 
     // MARK: Layers
@@ -124,33 +140,33 @@ struct OrbView: View {
         }
     }
 
-    private var breathScale: CGFloat {
-        guard breathing, !reduceMotion, state != .offline else { return 1.0 }
+    /// Target scale for each breath phase (`expanded` = inhaled).
+    private func breathScale(_ expanded: Bool) -> CGFloat {
+        guard expanded else { return 1.0 }
         switch state {
         case .listening, .speaking: return 1.08
         case .thinking: return 1.04
-        default: return 1.05
+        case .idle: return 1.05
+        case .offline: return 1.0
         }
     }
 
-    private var breathAnimation: Animation? {
-        guard !reduceMotion, state != .offline else { return nil }
-        let duration: Double
+    /// Per-state breath duration — faster when listening/replying, slow at rest.
+    private var breathDuration: Double {
         switch state {
-        case .idle: duration = 5.0
-        case .listening: duration = 2.1
-        case .thinking: duration = 3.4
-        case .speaking: duration = 1.5
-        case .offline: duration = 0
+        case .idle: return 5.0
+        case .listening: return 2.1
+        case .thinking: return 3.4
+        case .speaking: return 1.5
+        case .offline: return 0
         }
-        return .easeInOut(duration: duration).repeatForever(autoreverses: true)
     }
 
     private var rippleIntensity: Double { 0.5 + min(audioLevel, 1.0) * 0.5 }
 
     private var accessibilityLabel: String {
         switch state {
-        case .idle: return "Orb. Idle. Hold to speak."
+        case .idle: return "Orb. Idle. Talk to Me Heath."
         case .listening: return "Orb. Listening."
         case .thinking: return "Orb. Thinking."
         case .speaking: return "Orb. Replying."
