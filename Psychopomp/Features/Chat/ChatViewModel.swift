@@ -29,7 +29,11 @@ final class ChatViewModel {
         self.context = context
     }
 
-    var canSend: Bool { !isStreaming && config.isConfigured && !config.selectedModel.isEmpty }
+    var canSend: Bool {
+        guard !isStreaming else { return false }
+        if config.useAppleIntelligence && config.appleIntelligenceClient != nil { return true }
+        return config.isConfigured && !config.selectedModel.isEmpty
+    }
 
     // MARK: Sending
 
@@ -59,16 +63,39 @@ final class ChatViewModel {
 
         streamingMessage = assistant
         toolIndex.removeAll()
-        startStream(history: history, assistant: assistant)
+        startStream(history: history, latestText: trimmed, assistant: assistant)
     }
 
-    private func startStream(history: [WireMessage], assistant: ChatMessage) {
+    private func startStream(history: [WireMessage], latestText: String, assistant: ChatMessage) {
         isStreaming = true
         currentRunId = ""
+        conversation.model = config.selectedModel
+
+        // Route to Apple Intelligence when it is the active provider.
+        if config.useAppleIntelligence,
+           #available(iOS 26.0, *),
+           let aiClient = config.appleIntelligenceClient as? AppleIntelligenceClient {
+            let convId = conversation.id
+            streamTask = Task { @MainActor in
+                do {
+                    for try await event in aiClient.stream(conversationId: convId, prompt: latestText) {
+                        handle(event, assistant: assistant)
+                    }
+                } catch is CancellationError {
+                    // user stopped
+                } catch {
+                    assistant.status = .failed
+                    errorMessage = error.localizedDescription
+                    if assistant.text.isEmpty { assistant.text = "⚠︎ \(error.localizedDescription)" }
+                }
+                finalize(assistant)
+            }
+            return
+        }
+
+        // Hermes path.
         let model = config.selectedModel
         let sessionKey = conversation.id.uuidString
-        conversation.model = model  // track which model was used for this turn
-
         streamTask = Task { @MainActor in
             do {
                 for try await event in client.stream(messages: history, model: model, sessionKey: sessionKey) {

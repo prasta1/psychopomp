@@ -84,13 +84,19 @@ struct ChatView: View {
             Text("_")
                 .font(.system(size: 48, design: .monospaced))
                 .foregroundStyle(Theme.Color.green)
-            Text("Hermes is listening.")
-                .font(Theme.Font.callout)
-                .foregroundStyle(Theme.Color.textSecondary)
-            if config.selectedModel.isEmpty {
-                Text("Pick a model from the menu to begin.")
-                    .font(Theme.Font.caption)
-                    .foregroundStyle(Theme.Color.textDim)
+            if config.useAppleIntelligence && config.appleIntelligenceClient != nil {
+                Text("Apple Intelligence is ready.")
+                    .font(Theme.Font.callout)
+                    .foregroundStyle(Theme.Color.textSecondary)
+            } else {
+                Text("Hermes is listening.")
+                    .font(Theme.Font.callout)
+                    .foregroundStyle(Theme.Color.textSecondary)
+                if config.selectedModel.isEmpty {
+                    Text("Pick a model from the menu to begin.")
+                        .font(Theme.Font.caption)
+                        .foregroundStyle(Theme.Color.textDim)
+                }
             }
         }
     }
@@ -98,26 +104,37 @@ struct ChatView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
-            Menu {
-                if models.isEmpty {
-                    Text("No models loaded")
-                } else {
-                    Picker("Model", selection: modelSelection) {
-                        ForEach(models) { model in
-                            Text(model.id).tag(model.id)
-                        }
-                    }
-                }
-                Button {
-                    Task { await loadModels() }
-                } label: { Label("Reload models", systemImage: "arrow.clockwise") }
-            } label: {
+            if config.useAppleIntelligence && config.appleIntelligenceClient != nil {
+                // Apple Intelligence is active — show a non-interactive label.
                 HStack(spacing: 4) {
-                    Text(config.selectedModel.isEmpty ? "model" : shortModel)
+                    Image(systemName: "apple.intelligence")
+                        .font(.caption)
+                    Text("On-device")
                         .font(Theme.Font.caption)
-                    Image(systemName: "chevron.down").font(.caption2)
                 }
                 .foregroundStyle(Theme.Color.accent)
+            } else {
+                Menu {
+                    if models.isEmpty {
+                        Text("No models loaded")
+                    } else {
+                        Picker("Model", selection: modelSelection) {
+                            ForEach(models) { model in
+                                Text(model.id).tag(model.id)
+                            }
+                        }
+                    }
+                    Button {
+                        Task { await loadModels() }
+                    } label: { Label("Reload models", systemImage: "arrow.clockwise") }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(config.selectedModel.isEmpty ? "model" : shortModel)
+                            .font(Theme.Font.caption)
+                        Image(systemName: "chevron.down").font(.caption2)
+                    }
+                    .foregroundStyle(Theme.Color.accent)
+                }
             }
         }
     }
@@ -138,6 +155,8 @@ struct ChatView: View {
     private var bottomAnchor: String { "bottom-anchor" }
 
     private func loadModels() async {
+        // Apple Intelligence needs no model list fetch.
+        guard !config.useAppleIntelligence || config.appleIntelligenceClient == nil else { return }
         let client = HermesClient(config: config)
         if let fetched = try? await client.listModels(), !fetched.isEmpty {
             models = fetched

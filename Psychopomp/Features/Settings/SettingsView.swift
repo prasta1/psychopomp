@@ -16,23 +16,26 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
+                aiProviderSection
                 group("Server URL") {
                     field("http://127.0.0.1:8642", text: $baseURL, keyboard: .URL)
                 }
                 group("API key") {
                     field("API_SERVER_KEY", text: $apiKey, secure: true)
                 }
-                group("Default model") {
-                    if models.isEmpty {
-                        Text(config.selectedModel.isEmpty ? "Reload to fetch models" : config.selectedModel)
-                            .font(Theme.Font.sansBody)
-                            .foregroundStyle(Theme.Color.textCoolDim)
-                    } else {
-                        Picker("Model", selection: modelSelection) {
-                            ForEach(models) { Text($0.id).tag($0.id) }
+                if !config.useAppleIntelligence {
+                    group("Default model") {
+                        if models.isEmpty {
+                            Text(config.selectedModel.isEmpty ? "Reload to fetch models" : config.selectedModel)
+                                .font(Theme.Font.sansBody)
+                                .foregroundStyle(Theme.Color.textCoolDim)
+                        } else {
+                            Picker("Model", selection: modelSelection) {
+                                ForEach(models) { Text($0.id).tag($0.id) }
+                            }
+                            .pickerStyle(.menu)
+                            .tint(Theme.Color.aura)
                         }
-                        .pickerStyle(.menu)
-                        .tint(Theme.Color.aura)
                     }
                 }
 
@@ -43,8 +46,10 @@ struct SettingsView: View {
                 }
 
                 VStack(spacing: Theme.Spacing.md) {
-                    secondaryButton("Test & reload models", system: "arrow.clockwise") {
-                        Task { await reload() }
+                    if !config.useAppleIntelligence {
+                        secondaryButton("Test & reload models", system: "arrow.clockwise") {
+                            Task { await reload() }
+                        }
                     }
                     primaryButton("Save", system: "checkmark") {
                         persist(); dismiss()
@@ -70,7 +75,47 @@ struct SettingsView: View {
             baseURL = config.baseURLString
             apiKey = config.apiKey
         }
-        .task { await reload() }
+        .task {
+            if !config.useAppleIntelligence { await reload() }
+        }
+    }
+
+    // MARK: - Apple Intelligence section
+
+    @ViewBuilder
+    private var aiProviderSection: some View {
+        group("AI Provider") {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Toggle(isOn: Binding(
+                    get: { config.useAppleIntelligence },
+                    set: { config.useAppleIntelligence = $0 }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Apple Intelligence")
+                            .font(Theme.Font.sansBody)
+                            .foregroundStyle(Theme.Color.textCool)
+                        Text("On-device model · no server required")
+                            .font(Theme.Font.sansCaption)
+                            .foregroundStyle(Theme.Color.textCoolFaint)
+                    }
+                }
+                .tint(Theme.Color.aura)
+
+                if config.useAppleIntelligence && config.appleIntelligenceClient == nil {
+                    Label("Apple Intelligence is not available on this device or not enabled in Settings.",
+                          systemImage: "exclamationmark.triangle")
+                        .font(Theme.Font.sansCaption)
+                        .foregroundStyle(Theme.Color.red)
+                }
+            }
+            .padding(Theme.Spacing.md)
+            .background(Color.white.opacity(0.05),
+                        in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .strokeBorder(Theme.Color.aura.opacity(0.35), lineWidth: 1)
+            )
+        }
     }
 
     // MARK: - Ethereal building blocks

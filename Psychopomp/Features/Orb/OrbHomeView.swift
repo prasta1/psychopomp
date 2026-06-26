@@ -23,7 +23,7 @@ struct OrbHomeView: View {
     @State private var showKeyboard = false
     @State private var keyboardDraft = ""
     @State private var models: [HermesModelInfo] = []
-    /// Whether the last model fetch actually reached the server (drives the status dot).
+    /// Whether the last Hermes model fetch succeeded (drives the status dot).
     @State private var reachable = false
     @FocusState private var typing: Bool
     /// Icon-button sizes that grow with Dynamic Type so glyphs and hit-targets scale together.
@@ -176,17 +176,33 @@ struct OrbHomeView: View {
             Circle()
                 .fill(dotColor)
                 .frame(width: 7, height: 7)
-            Text(config.selectedModel.isEmpty ? "no model" : shortModel)
+            Text(statusLabel)
                 .font(Theme.Font.sansCaption)
                 .foregroundStyle(Theme.Color.textCoolDim)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(reachable ? "Connected. Model \(config.selectedModel)." : "Not connected.")
+        .accessibilityLabel(accessibilityStatusLabel)
     }
 
-    /// Green only when a live model fetch succeeded; neutral when configured but
-    /// unconfirmed; red when there's no usable connection at all.
+    private var statusLabel: String {
+        if config.selectedModel.isEmpty { return "no model" }
+        let id = config.selectedModel
+        return id.count > 16 ? "…" + id.suffix(14) : id
+    }
+
+    private var accessibilityStatusLabel: String {
+        if config.useAppleIntelligence && config.appleIntelligenceClient != nil {
+            return "Apple Intelligence active."
+        }
+        return reachable ? "Connected. Model \(config.selectedModel)." : "Not connected."
+    }
+
+    /// Green when a provider is ready, dim when Hermes is configured but unconfirmed,
+    /// red when nothing is configured.
     private var dotColor: Color {
+        if config.useAppleIntelligence {
+            return config.appleIntelligenceClient != nil ? Theme.Color.green : Theme.Color.red
+        }
         if !config.isConfigured { return Theme.Color.red }
         return reachable ? Theme.Color.green : Theme.Color.textCoolFaint
     }
@@ -229,7 +245,7 @@ struct OrbHomeView: View {
 
     private var keyboardBar: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            TextField("Type to Hermes…", text: $keyboardDraft, axis: .vertical)
+            TextField("Type a message…", text: $keyboardDraft, axis: .vertical)
                 .focused($typing)
                 .font(Theme.Font.sansBody)
                 .foregroundStyle(Theme.Color.textCool)
@@ -370,7 +386,8 @@ struct OrbHomeView: View {
 
     private func ensureConversation() {
         if conversation == nil {
-            let convo = Conversation(model: config.selectedModel)
+            let model = config.useAppleIntelligence ? config.selectedModel : config.selectedModel
+            let convo = Conversation(model: model)
             modelContext.insert(convo)
             try? modelContext.save()
             conversation = convo
@@ -400,6 +417,11 @@ struct OrbHomeView: View {
     }
 
     private func loadModels() async {
+        // Apple Intelligence is always ready — no server fetch needed.
+        if config.useAppleIntelligence && config.appleIntelligenceClient != nil {
+            reachable = true
+            return
+        }
         let client = HermesClient(config: config)
         if let fetched = try? await client.listModels(), !fetched.isEmpty {
             models = fetched

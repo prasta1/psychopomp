@@ -1,8 +1,9 @@
 import Foundation
 import SwiftUI
 
-/// Holds connection settings. The base URL and selected model are non-secret and
-/// persist in UserDefaults; the API key lives in the Keychain.
+/// Holds connection settings and AI provider selection.
+/// Base URL and selected model are non-secret and persist in UserDefaults;
+/// the API key lives in the Keychain.
 @Observable
 final class HermesConfig {
     var baseURLString: String {
@@ -12,6 +13,34 @@ final class HermesConfig {
     var selectedModel: String {
         didSet { UserDefaults.standard.set(selectedModel, forKey: Keys.model) }
     }
+
+    /// When true, the on-device Apple Intelligence model is used instead of the
+    /// Hermes server. Persisted so the choice survives app restarts.
+    var useAppleIntelligence: Bool {
+        didSet {
+            UserDefaults.standard.set(useAppleIntelligence, forKey: Keys.useAppleIntelligence)
+            if useAppleIntelligence {
+                if #available(iOS 26.0, *) {
+                    let client = AppleIntelligenceClient()
+                    if client.isAvailable {
+                        appleIntelligenceClient = client
+                        selectedModel = AppleIntelligenceClient.modelDisplayName
+                        return
+                    }
+                }
+                // Apple Intelligence unavailable — leave the flag set but clear the client.
+                appleIntelligenceClient = nil
+            } else {
+                appleIntelligenceClient = nil
+                if selectedModel == "Apple Intelligence" { selectedModel = "" }
+            }
+        }
+    }
+
+    /// Opaque runtime reference to `AppleIntelligenceClient` (stored as `AnyObject`
+    /// to avoid `@available` annotations at every call site). Non-nil only when
+    /// iOS 26+ with Apple Intelligence available and `useAppleIntelligence == true`.
+    var appleIntelligenceClient: AnyObject?
 
     /// Backed by the Keychain.
     var apiKey: String {
@@ -26,13 +55,37 @@ final class HermesConfig {
 
     init() {
         self.baseURLString = UserDefaults.standard.string(forKey: Keys.baseURL) ?? ""
-        self.selectedModel = UserDefaults.standard.string(forKey: Keys.model) ?? "nousresearch/hermes-4-70b"
         self.apiKey = Keychain.read() ?? ""
+
+        // Determine Apple Intelligence availability and set up the client.
+        var aiClient: AnyObject? = nil
+        var useAI = false
+        if #available(iOS 26.0, *) {
+            let client = AppleIntelligenceClient()
+            if client.isAvailable {
+                aiClient = client
+                let saved = UserDefaults.standard.object(forKey: Keys.useAppleIntelligence) as? Bool
+                useAI = saved ?? true   // Default: enabled when Apple Intelligence is present
+            }
+        }
+        self.useAppleIntelligence = useAI
+        self.appleIntelligenceClient = aiClient
+
+        // Select a default model for display.
+        let savedModel = UserDefaults.standard.string(forKey: Keys.model)
+        if let savedModel, !savedModel.isEmpty {
+            self.selectedModel = savedModel
+        } else if useAI {
+            self.selectedModel = "Apple Intelligence"
+        } else {
+            self.selectedModel = "nousresearch/hermes-4-70b"
+        }
     }
 
-    /// Whether enough is configured to attempt a connection.
+    /// Whether enough is configured to make a request.
     var isConfigured: Bool {
-        normalizedBaseURL != nil
+        if useAppleIntelligence && appleIntelligenceClient != nil { return true }
+        return normalizedBaseURL != nil
     }
 
     /// Trim trailing slashes and validate.
@@ -47,5 +100,6 @@ final class HermesConfig {
     private enum Keys {
         static let baseURL = "hermes.baseURL"
         static let model = "hermes.model"
+        static let useAppleIntelligence = "hermes.useAppleIntelligence"
     }
 }

@@ -4,6 +4,7 @@ import SwiftData
 @main
 struct PsychopompApp: App {
     @State private var config = HermesConfig()
+    @State private var theme = ThemeManager.shared
 
     /// Shared SwiftData stack for conversations, messages, tool events, attachments.
     let modelContainer: ModelContainer = {
@@ -20,7 +21,8 @@ struct PsychopompApp: App {
         WindowGroup {
             RootView()
                 .environment(config)
-                .preferredColorScheme(.dark)
+                .environment(theme)
+                .preferredColorScheme(theme.palette.colorScheme)
                 .tint(Theme.Color.accent)
         }
         .modelContainer(modelContainer)
