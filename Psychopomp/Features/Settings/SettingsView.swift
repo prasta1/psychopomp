@@ -12,7 +12,6 @@ struct SettingsView: View {
     @State private var port = ""
     @State private var apiKey = ""
     @State private var models: [HermesModelInfo] = []
-    @State private var manualModel = ""
     @State private var status: String?
     @State private var statusOK = true
 
@@ -101,7 +100,6 @@ struct SettingsView: View {
             host = parsed.host
             port = parsed.port
             apiKey = config.apiKey
-            manualModel = config.selectedModel
             if host.isEmpty && port.isEmpty {
                 host = config.endpointType.defaultHost
                 port = config.endpointType.defaultPort
@@ -132,7 +130,9 @@ struct SettingsView: View {
 
             group("Model") {
                 if models.isEmpty {
-                    field("Model ID", text: $manualModel)
+                    Text("Tap \"Reload models\" to fetch available models")
+                        .font(Theme.Font.sansBody)
+                        .foregroundStyle(Theme.Color.textCoolFaint)
                 } else {
                     Picker("Model", selection: modelSelection) {
                         ForEach(models) { Text($0.id).tag($0.id) }
@@ -263,6 +263,13 @@ struct SettingsView: View {
                 port = newType.defaultPort
                 models = []
                 status = nil
+                // Persist the new endpoint and auto-fetch models
+                config.baseURLString = newType.defaultHost.isEmpty
+                    ? ""
+                    : "\(newType.defaultHost):\(newType.defaultPort)"
+                if newType.isServerBased {
+                    Task { await reloadModels() }
+                }
             }
         )
     }
@@ -279,9 +286,6 @@ struct SettingsView: View {
         let p = port.trimmingCharacters(in: .whitespacesAndNewlines)
         config.baseURLString = p.isEmpty ? h : "\(h):\(p)"
         config.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        if models.isEmpty {
-            config.selectedModel = manualModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
     }
 
     /// Parse a base URL string into host and port components.
