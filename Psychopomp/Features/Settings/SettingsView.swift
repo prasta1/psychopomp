@@ -6,6 +6,7 @@ import UIKit
 struct SettingsView: View {
     @Environment(HermesConfig.self) private var config
     @Environment(\.dismiss) private var dismiss
+    @Bindable private var theme = ThemeManager.shared
 
     @State private var baseURL = ""
     @State private var apiKey = ""
@@ -37,6 +38,16 @@ struct SettingsView: View {
                             .tint(Theme.Color.aura)
                         }
                     }
+                }
+
+                group("Appearance") {
+                    Picker("Theme", selection: $theme.selected) {
+                        ForEach(ThemeID.allCases) { id in
+                            Text(id.displayName).tag(id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(Theme.Color.aura)
                 }
 
                 if let status {
