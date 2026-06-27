@@ -20,7 +20,7 @@ struct Palette {
 
 /// The selectable themes.
 enum ThemeID: String, CaseIterable, Identifiable {
-    case ethereal, traditionalDark, traditionalLight, catppuccinMocha, catppuccinLatte
+    case ethereal, traditionalDark, traditionalLight, catppuccinMocha, catppuccinLatte, catpoopchin
 
     var id: String { rawValue }
 
@@ -31,6 +31,7 @@ enum ThemeID: String, CaseIterable, Identifiable {
         case .traditionalLight: return "Light"
         case .catppuccinMocha: return "Catppuccin Mocha"
         case .catppuccinLatte: return "Catppuccin Latte"
+        case .catpoopchin: return "Catpoopchin"
         }
     }
 
@@ -41,6 +42,7 @@ enum ThemeID: String, CaseIterable, Identifiable {
         case .traditionalLight: return .traditionalLight
         case .catppuccinMocha: return .catppuccinMocha
         case .catppuccinLatte: return .catppuccinLatte
+        case .catpoopchin: return .catpoopchin
         }
     }
 }
@@ -101,4 +103,15 @@ extension Palette {
         orbHighlight: Color(hex: 0xD9C4F5), orbMid: Color(hex: 0x6B4BA0), orbDeep: Color(hex: 0x36285C),
         orbCore: Color(hex: 0x1E1B2E), orbOffline: Color(hex: 0x9CA0B0),
         orbStyle: .jewel, colorScheme: .light)
+
+    static let catpoopchin = Palette(
+        bg: Color(hex: 0x2B1D0E), canvas: Color(hex: 0x1A110A), canvasTop: Color(hex: 0x2B1D0E),
+        surface: Color(hex: 0x3D2B1A), raised: Color(hex: 0x4E3A24), border: Color(hex: 0x5C4530),
+        textPrimary: Color(hex: 0xD4C4A0), textSecondary: Color(hex: 0xA89070), textDim: Color(hex: 0x6B5A42),
+        textCool: Color(hex: 0xC8B888), textCoolDim: Color(hex: 0x8A7A58), textCoolFaint: Color(hex: 0x5C4E38),
+        accent: Color(hex: 0x9B8B30), aura: Color(hex: 0x7A6B20), aura2: Color(hex: 0x8B7B28),
+        green: Color(hex: 0x6B7B30), red: Color(hex: 0x8B3A20),
+        orbHighlight: Color(hex: 0xE8D8A0), orbMid: Color(hex: 0xB8A060), orbDeep: Color(hex: 0x7A6530),
+        orbCore: Color(hex: 0x3A2A10), orbOffline: Color(hex: 0x5A4A30),
+        orbStyle: .glow, colorScheme: .dark)
 }
