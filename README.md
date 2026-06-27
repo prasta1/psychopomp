@@ -3,6 +3,7 @@
 <img width="500" height="500" alt="Gemini_Generated_Image_37a8qm37a8qm37a8" src="https://github.com/user-attachments/assets/077cdfa0-f32b-45e4-b749-088f28273834" />
 
 
+
 A native iOS companion for your self-hosted **[Hermes Agent](https://github.com/nousresearch/hermes-agent)**.
 Connects to the agent's OpenAI-compatible API server, streams runs with live
 tool-progress, and is styled after Nous Research's retro-terminal aesthetic.
