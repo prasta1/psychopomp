@@ -26,6 +26,13 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.menu)
                     .tint(Theme.Color.aura)
+                    .padding(Theme.Spacing.md)
+                    .background(Color.white.opacity(0.05),
+                                in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                            .strokeBorder(Theme.Color.aura.opacity(0.35), lineWidth: 1)
+                    )
                 }
 
                 aiProviderSection
