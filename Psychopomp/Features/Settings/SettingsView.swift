@@ -97,12 +97,12 @@ struct SettingsView: View {
             }
         }
         .onAppear {
-            host = config.host
-            port = config.port
+            let parsed = Self.parseURL(config.baseURLString)
+            host = parsed.host
+            port = parsed.port
             apiKey = config.apiKey
             manualModel = config.selectedModel
-            // Auto-fill defaults for new endpoint selections
-            if host.isEmpty && port.isEmpty && !config.endpointType.isServerBased == false {
+            if host.isEmpty && port.isEmpty {
                 host = config.endpointType.defaultHost
                 port = config.endpointType.defaultPort
             }
@@ -149,11 +149,11 @@ struct SettingsView: View {
     @ViewBuilder
     private var appleIntelligenceSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            if config.useAppleIntelligence && config.appleIntelligenceClient != nil {
+            if config.isAppleIntelligenceActive {
                 Label("Apple Intelligence is ready", systemImage: "checkmark.circle")
                     .font(Theme.Font.sansBody)
                     .foregroundStyle(Theme.Color.green)
-            } else if config.useAppleIntelligence && config.appleIntelligenceClient == nil {
+            } else if config.useAppleIntelligence && !config.isAppleIntelligenceActive {
                 Label("Not available on this device or not enabled in Settings.",
                       systemImage: "exclamationmark.triangle")
                     .font(Theme.Font.sansCaption)
@@ -259,16 +259,8 @@ struct SettingsView: View {
             set: { newType in
                 config.endpointType = newType
                 config.useAppleIntelligence = (newType == .appleIntelligence)
-                // Auto-fill defaults when switching endpoints and write to config
-                // so isConfigured stays true when switching away from Apple Intelligence.
-                if newType.defaultHost != "127.0.0.1" || host == "127.0.0.1" {
-                    host = newType.defaultHost
-                    config.host = newType.defaultHost
-                }
-                if newType.defaultPort != port {
-                    port = newType.defaultPort
-                    config.port = newType.defaultPort
-                }
+                host = newType.defaultHost
+                port = newType.defaultPort
                 models = []
                 status = nil
             }
@@ -285,13 +277,22 @@ struct SettingsView: View {
         let h = host.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "^https?://", with: "", options: .regularExpression)
         let p = port.trimmingCharacters(in: .whitespacesAndNewlines)
-        config.host = h
-        config.port = p
+        config.baseURLString = p.isEmpty ? h : "\(h):\(p)"
         config.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let model = models.isEmpty
-            ? manualModel.trimmingCharacters(in: .whitespacesAndNewlines)
-            : config.selectedModel
-        config.selectedModel = model
+        if models.isEmpty {
+            config.selectedModel = manualModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    /// Parse a base URL string into host and port components.
+    private static func parseURL(_ url: String) -> (host: String, port: String) {
+        let trimmed = url.replacingOccurrences(of: "^https?://", with: "", options: .regularExpression)
+        if let colonRange = trimmed.range(of: ":", options: .backwards) {
+            let host = String(trimmed[..<colonRange.lowerBound])
+            let port = String(trimmed[colonRange.upperBound...])
+            return (host, port)
+        }
+        return (trimmed, "")
     }
 
     private func testConnection() async {

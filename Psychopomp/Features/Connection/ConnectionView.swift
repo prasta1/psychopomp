@@ -88,7 +88,10 @@ struct ConnectionView: View {
     }
 
     private var canConnect: Bool {
-        config.normalizedFrom(baseURL) != nil
+        let trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let stripped = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+        return URL(string: stripped) != nil
     }
 
     private func persist() {
@@ -112,16 +115,5 @@ struct ConnectionView: View {
         } catch {
             state = .failure(error.localizedDescription)
         }
-    }
-}
-
-extension HermesConfig {
-    /// Validate an arbitrary string the way `normalizedBaseURL` validates the stored one.
-    func normalizedFrom(_ string: String) -> URL? {
-        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        let stripped = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
-        guard let url = URL(string: stripped), url.scheme != nil, url.host != nil else { return nil }
-        return url
     }
 }

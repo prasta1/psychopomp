@@ -199,7 +199,7 @@ struct OrbHomeView: View {
     }
 
     private var statusLabel: String {
-        if config.useAppleIntelligence && config.appleIntelligenceClient != nil {
+        if config.isAppleIntelligenceActive {
             return "Apple Intelligence"
         }
         if config.selectedModel.isEmpty { return "no model" }
@@ -208,7 +208,7 @@ struct OrbHomeView: View {
     }
 
     private var accessibilityStatusLabel: String {
-        if config.useAppleIntelligence && config.appleIntelligenceClient != nil {
+        if config.isAppleIntelligenceActive {
             return "Apple Intelligence active."
         }
         return reachable ? "Connected. Model \(config.selectedModel)." : "Not connected."
@@ -404,7 +404,7 @@ struct OrbHomeView: View {
 
     private func ensureConversation() {
         if conversation == nil {
-            let model = config.useAppleIntelligence ? config.selectedModel : config.selectedModel
+            let model = config.selectedModel
             let convo = Conversation(model: model)
             modelContext.insert(convo)
             try? modelContext.save()
@@ -436,7 +436,7 @@ struct OrbHomeView: View {
 
     private func loadModels() async {
         // Apple Intelligence is always ready — no server fetch needed.
-        if config.useAppleIntelligence && config.appleIntelligenceClient != nil {
+        if config.isAppleIntelligenceActive {
             reachable = true
             return
         }

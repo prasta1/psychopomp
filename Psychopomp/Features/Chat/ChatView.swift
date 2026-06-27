@@ -84,7 +84,7 @@ struct ChatView: View {
             Text("_")
                 .font(.system(size: 48, design: .monospaced))
                 .foregroundStyle(Theme.Color.green)
-            if config.useAppleIntelligence && config.appleIntelligenceClient != nil {
+            if config.isAppleIntelligenceActive {
                 Text("Apple Intelligence is ready.")
                     .font(Theme.Font.callout)
                     .foregroundStyle(Theme.Color.textSecondary)
@@ -104,7 +104,7 @@ struct ChatView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
-            if config.useAppleIntelligence && config.appleIntelligenceClient != nil {
+            if config.isAppleIntelligenceActive {
                 // Apple Intelligence is active — show a non-interactive label.
                 HStack(spacing: 4) {
                     Image(systemName: "apple.intelligence")

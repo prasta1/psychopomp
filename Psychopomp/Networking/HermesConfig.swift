@@ -136,51 +136,13 @@ final class HermesConfig {
 
     /// Whether enough is configured to make a request.
     var isConfigured: Bool {
-        if useAppleIntelligence && appleIntelligenceClient != nil { return true }
+        if isAppleIntelligenceActive { return true }
         return normalizedBaseURL != nil
     }
 
-    /// Host portion of the server URL (no scheme, no port).
-    var host: String {
-        get {
-            let trimmed = baseURLString
-                .replacingOccurrences(of: "^https?://", with: "", options: .regularExpression)
-            if let colonRange = trimmed.range(of: ":", options: .backwards) {
-                let candidate = String(trimmed[..<colonRange.lowerBound])
-                return candidate.hasPrefix("[") && candidate.hasSuffix("]")
-                    ? String(candidate.dropFirst().dropLast())
-                    : candidate
-            }
-            return trimmed
-        }
-        set {
-            let portPart = port.isEmpty ? "" : ":\(port)"
-            let cleaned = newValue
-                .replacingOccurrences(of: "^https?://", with: "", options: .regularExpression)
-            baseURLString = "\(cleaned)\(portPart)"
-        }
-    }
-
-    /// Port portion of the server URL.
-    var port: String {
-        get {
-            let trimmed = baseURLString
-                .replacingOccurrences(of: "^https?://", with: "", options: .regularExpression)
-            if let colonRange = trimmed.range(of: ":", options: .backwards) {
-                let afterColon = trimmed[colonRange.upperBound...]
-                if !afterColon.isEmpty { return String(afterColon) }
-            }
-            return ""
-        }
-        set {
-            let hostPart = host
-            let cleaned = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            if cleaned.isEmpty {
-                baseURLString = hostPart
-            } else {
-                baseURLString = "\(hostPart):\(cleaned)"
-            }
-        }
+    /// Apple Intelligence ready to use.
+    var isAppleIntelligenceActive: Bool {
+        useAppleIntelligence && appleIntelligenceClient != nil
     }
 
     /// Trim trailing slashes and validate.

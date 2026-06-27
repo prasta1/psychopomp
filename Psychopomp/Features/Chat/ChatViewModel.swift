@@ -31,7 +31,7 @@ final class ChatViewModel {
 
     var canSend: Bool {
         guard !isStreaming else { return false }
-        if config.useAppleIntelligence && config.appleIntelligenceClient != nil { return true }
+        if config.isAppleIntelligenceActive { return true }
         return config.isConfigured && !config.selectedModel.isEmpty
     }
 

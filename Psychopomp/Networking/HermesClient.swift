@@ -184,7 +184,8 @@ final class HermesClient {
     /// `POST /v1/runs/{id}/stop`.
     func stop(runId: String) async {
         guard !runId.isEmpty else { return }
-        _ = try? await URLSession.shared.data(for: request_(("/v1/runs/\(runId)/stop"), method: "POST"))
+        guard let req = try? request("/v1/runs/\(runId)/stop", method: "POST") else { return }
+        _ = try? await URLSession.shared.data(for: req)
     }
 
     /// `POST /v1/runs/{id}/approval` — resolve an approval gate.
@@ -226,11 +227,6 @@ final class HermesClient {
             req.httpBody = try JSONSerialization.data(withJSONObject: json)
         }
         return req
-    }
-
-    /// Non-throwing helper for fire-and-forget control calls.
-    private func request_(_ path: String, method: String) -> URLRequest {
-        (try? request(path, method: method)) ?? URLRequest(url: URL(string: "about:blank")!)
     }
 
     /// Encode `[WireMessage]` to plain `[[String: Any]]` for JSONSerialization.
