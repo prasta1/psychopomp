@@ -16,9 +16,6 @@ final class VoiceRecorder {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
 
-    /// False if the on-device recognizer is unavailable (no network, unsupported locale, etc.).
-    var isAvailable: Bool { recognizer?.isAvailable == true }
-
     init() {
         recognizer = SFSpeechRecognizer()
     }

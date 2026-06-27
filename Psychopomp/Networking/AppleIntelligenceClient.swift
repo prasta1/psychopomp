@@ -14,7 +14,6 @@ final class AppleIntelligenceClient {
     private var sessions: [UUID: LanguageModelSession] = [:]
     private let model = SystemLanguageModel.default
 
-    var availability: SystemLanguageModel.Availability { model.availability }
     var isAvailable: Bool { model.availability == .available }
 
     /// Returns the persistent session for `id`, creating one on first access.

@@ -316,11 +316,6 @@ struct OrbHomeView: View {
         !keyboardDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private var shortModel: String {
-        let id = config.selectedModel
-        return id.count > 16 ? "…" + id.suffix(14) : id
-    }
-
     // MARK: - Gesture (hold OR tap-lock)
 
     private var orbGesture: some Gesture {
