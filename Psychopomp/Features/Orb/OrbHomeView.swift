@@ -251,6 +251,12 @@ struct OrbHomeView: View {
                 .foregroundStyle(Theme.Color.textCool)
                 .tint(Theme.Color.aura)
                 .lineLimit(1...4)
+                .onSubmit {
+                    guard canSendText else { return }
+                    sendText(keyboardDraft)
+                    keyboardDraft = ""
+                    showKeyboard = false
+                }
                 .padding(.horizontal, Theme.Spacing.md)
                 .padding(.vertical, Theme.Spacing.sm)
                 .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
