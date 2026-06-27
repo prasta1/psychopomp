@@ -3,46 +3,46 @@ import SwiftUI
 
 /// Which AI backend the user is connecting to.
 enum EndpointType: String, CaseIterable, Identifiable {
-    case lmStudio, ollama, tailscale, appleIntelligence
+    case hermes, lmStudio, ollama, custom, appleIntelligence
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
+        case .hermes: return "Hermes"
         case .lmStudio: return "LM Studio"
         case .ollama: return "Ollama"
-        case .tailscale: return "Tailscale / Custom"
+        case .custom: return "Custom"
         case .appleIntelligence: return "Apple Intelligence"
         }
     }
 
     var defaultPort: String {
         switch self {
+        case .hermes: return "8642"
         case .lmStudio: return "1234"
         case .ollama: return "11434"
-        case .tailscale: return "8642"
+        case .custom: return "8642"
         case .appleIntelligence: return ""
         }
     }
 
     var defaultHost: String {
         switch self {
+        case .hermes, .custom: return ""
         case .lmStudio, .ollama: return "127.0.0.1"
-        case .tailscale: return ""
         case .appleIntelligence: return ""
         }
     }
 
-    /// Whether this endpoint needs an API key field.
     var showsAPIKey: Bool {
         switch self {
-        case .lmStudio, .ollama: return false
-        case .tailscale: return true
+        case .hermes, .lmStudio, .ollama: return false
+        case .custom: return true
         case .appleIntelligence: return false
         }
     }
 
-    /// Whether this endpoint is server-based (vs on-device).
     var isServerBased: Bool { self != .appleIntelligence }
 }
 
