@@ -74,7 +74,7 @@ struct RecentSessionsSheet: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Open full transcript")
 
-            if let lastUserMsg = convo.orderedMessages.last(where: { $0.role == .user }) {
+            if convo.orderedMessages.contains(where: { $0.role == .user }) {
                 Button { onResend(convo) } label: {
                     Image(systemName: "arrow.counterclockwise")
                         .foregroundStyle(Theme.Color.aura)

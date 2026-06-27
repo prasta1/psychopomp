@@ -1,5 +1,5 @@
 import Foundation
-import Network
+@preconcurrency import Network
 
 /// Discovers AI model servers on the local network via mDNS (Bonjour) and
 /// direct port probing. Returns endpoints that respond to `/v1/models`.
@@ -10,14 +10,14 @@ final class NetworkDiscovery: ObservableObject {
 
     private var browser: NWBrowser?
 
-    struct DiscoveredEndpoint: Identifiable, Hashable {
+    struct DiscoveredEndpoint: Identifiable, Hashable, Sendable {
         let id = UUID()
         let host: String
         let port: UInt16
         let name: String
         let source: Source
 
-        enum Source: String {
+        enum Source: String, Sendable {
             case mdns, probe
         }
 
@@ -84,32 +84,36 @@ final class NetworkDiscovery: ObservableObject {
     }
 
     private func handleMBrowserResult(_ result: NWBrowser.Result) async {
-        guard let endpoint = result.endpoint as? NWEndpoint,
-              case .service(let name, _, _, _) = endpoint else { return }
+        guard case .service(let name, _, _, _) = result.endpoint else { return }
 
-        let connection = NWConnection(to: endpoint, using: .tcp)
+        let connection = NWConnection(to: result.endpoint, using: .tcp)
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             connection.stateUpdateHandler = { state in
-                if case .ready = state {
+                switch state {
+                case .ready:
                     if let path = connection.currentPath,
                        let remote = path.remoteEndpoint,
-                       case .hostPort(let host, let port) = remote {
-                        let hostStr: String
-                        switch host {
+                       case .hostPort(let endpointHost, let endpointPort) = remote {
+                        var hostStr = ""
+                        switch endpointHost {
                         case .ipv4(let addr): hostStr = "\(addr)"
                         case .ipv6(let addr): hostStr = "\(addr)"
                         @unknown default:
-                            connection.cancel()
-                            continuation.resume()
-                            return
+                            break
                         }
-                        Task { @MainActor in
-                            self.addDiscovered(host: hostStr, port: port.rawValue, name: name, source: .mdns)
+                        if !hostStr.isEmpty {
+                            let capturedName = name
+                            let capturedPort = endpointPort.rawValue
+                            Task { @MainActor in
+                                self.addDiscovered(host: hostStr, port: capturedPort, name: capturedName, source: .mdns)
+                            }
                         }
                     }
                     connection.cancel()
                     continuation.resume()
-                } else {
+                case .waiting, .failed, .cancelled:
+                    continuation.resume()
+                @unknown default:
                     continuation.resume()
                 }
             }
@@ -141,20 +145,18 @@ final class NetworkDiscovery: ObservableObject {
 
     private nonisolated static func localIPAddress(for iface: NWInterface) -> String? {
         var ifaddr: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&ifaddr) == 0, let first = ifaddr else { return nil }
+        guard getifaddrs(&ifaddr) == 0, let start = ifaddr else { return nil }
         defer { freeifaddrs(ifaddr) }
-        var ptr = first
-        while ptr != nil {
-            defer { ptr = ptr.pointee.ifa_next }
-            let name = String(cString: ptr.pointee.ifa_name)
+        var ptr: UnsafeMutablePointer<ifaddrs>? = start
+        while let current = ptr {
+            defer { ptr = current.pointee.ifa_next }
+            let name = String(cString: current.pointee.ifa_name)
             guard name == iface.name else { continue }
-            let addr = ptr.pointee.ifa_addr
-            guard addr != nil else { continue }
-            if addr!.pointee.sa_family == UInt8(AF_INET) {
-                var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-                getnameinfo(addr, socklen_t(addr!.pointee.sa_len), &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
-                return String(cString: hostname)
-            }
+            guard let addr = current.pointee.ifa_addr,
+                  addr.pointee.sa_family == UInt8(AF_INET) else { continue }
+            var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            getnameinfo(addr, socklen_t(addr.pointee.sa_len), &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
+            return String(cString: hostname)
         }
         return nil
     }
@@ -177,25 +179,29 @@ final class NetworkDiscovery: ObservableObject {
 
     private nonisolated func probeEndpoint(host: String, port: UInt16, name: String) {
         let conn = NWConnection(host: NWEndpoint.Host(host), port: NWEndpoint.Port(rawValue: port)!, using: .tcp)
-        let timeout = DispatchWorkItem { conn.cancel() }
+        let hostCaptured = host
+        let portCaptured = port
+        let nameCaptured = name
 
         conn.stateUpdateHandler = { state in
             switch state {
             case .ready:
-                DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { timeout.cancel() }
-                self.httpProbe(host: host, port: port, name: name) { conn.cancel() }
-            case .failed, .cancelled:
-                timeout.cancel()
-            default:
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { conn.cancel() }
+                self.httpProbe(host: hostCaptured, port: portCaptured, name: nameCaptured) { conn.cancel() }
+            case .waiting, .failed, .cancelled:
+                break
+            @unknown default:
                 break
             }
         }
 
         conn.start(queue: .global(qos: .userInitiated))
-        DispatchQueue.global().asyncAfter(deadline: .now() + 1.5, execute: timeout)
+        DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) {
+            conn.cancel()
+        }
     }
 
-    private nonisolated func httpProbe(host: String, port: UInt16, name: String, completion: @escaping () -> Void) {
+    private nonisolated func httpProbe(host: String, port: UInt16, name: String, completion: @escaping @Sendable () -> Void) {
         guard let url = URL(string: "http://\(host):\(port)/v1/models") else { completion(); return }
         var req = URLRequest(url: url)
         req.timeoutInterval = 2
@@ -210,8 +216,11 @@ final class NetworkDiscovery: ObservableObject {
                 completion()
                 return
             }
+            let ep = DiscoveredEndpoint(host: host, port: port, name: name, source: .probe)
             Task { @MainActor in
-                self.addDiscovered(host: host, port: port, name: name, source: .probe)
+                if !self.discovered.contains(ep) {
+                    self.discovered.append(ep)
+                }
             }
             completion()
         }.resume()
