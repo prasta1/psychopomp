@@ -47,7 +47,7 @@ struct SettingsView: View {
                     field("API_SERVER_KEY (not required)", text: $apiKey, secure: true)
                 }
                 if !config.useAppleIntelligence {
-                    group("Default model") {
+                    group("Model") {
                         if models.isEmpty {
                             field("Model ID", text: $manualModel)
                         } else {
