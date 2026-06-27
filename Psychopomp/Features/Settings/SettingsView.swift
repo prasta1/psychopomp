@@ -8,7 +8,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable private var theme = ThemeManager.shared
 
-    @State private var baseURL = ""
+    @State private var host = ""
+    @State private var port = ""
     @State private var apiKey = ""
     @State private var models: [HermesModelInfo] = []
     @State private var status: String?
@@ -17,12 +18,25 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
+                group("Appearance") {
+                    Picker("Theme", selection: $theme.selected) {
+                        ForEach(ThemeID.allCases) { id in
+                            Text(id.displayName).tag(id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(Theme.Color.aura)
+                }
+
                 aiProviderSection
-                group("Server URL") {
-                    field("http://127.0.0.1:8642", text: $baseURL, keyboard: .URL)
+                group("Server") {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        field("Host", text: $host, keyboard: .default)
+                        field("Port", text: $port, keyboard: .numberPad)
+                    }
                 }
                 group("API key") {
-                    field("API_SERVER_KEY", text: $apiKey, secure: true)
+                    field("API_SERVER_KEY (not required)", text: $apiKey, secure: true)
                 }
                 if !config.useAppleIntelligence {
                     group("Default model") {
@@ -38,16 +52,6 @@ struct SettingsView: View {
                             .tint(Theme.Color.aura)
                         }
                     }
-                }
-
-                group("Appearance") {
-                    Picker("Theme", selection: $theme.selected) {
-                        ForEach(ThemeID.allCases) { id in
-                            Text(id.displayName).tag(id)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .tint(Theme.Color.aura)
                 }
 
                 if let status {
@@ -83,7 +87,8 @@ struct SettingsView: View {
             }
         }
         .onAppear {
-            baseURL = config.baseURLString
+            host = config.host
+            port = config.port
             apiKey = config.apiKey
         }
         .task {
@@ -216,7 +221,11 @@ struct SettingsView: View {
     }
 
     private func persist() {
-        config.baseURLString = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let h = host.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "^https?://", with: "", options: .regularExpression)
+        let p = port.trimmingCharacters(in: .whitespacesAndNewlines)
+        config.host = h
+        config.port = p
         config.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 

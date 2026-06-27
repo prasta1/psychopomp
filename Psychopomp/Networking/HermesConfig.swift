@@ -88,12 +88,59 @@ final class HermesConfig {
         return normalizedBaseURL != nil
     }
 
+    /// Host portion of the server URL (no scheme, no port).
+    var host: String {
+        get {
+            let trimmed = baseURLString
+                .replacingOccurrences(of: "^https?://", with: "", options: .regularExpression)
+            if let colonRange = trimmed.range(of: ":", options: .backwards) {
+                // Could be host:port or [ipv6]:port — strip port
+                let candidate = String(trimmed[..<colonRange.lowerBound])
+                return candidate.hasPrefix("[") && candidate.hasSuffix("]")
+                    ? String(candidate.dropFirst().dropLast())
+                    : candidate
+            }
+            return trimmed
+        }
+        set {
+            let portPart = port.isEmpty ? "" : ":\(port)"
+            let cleaned = newValue
+                .replacingOccurrences(of: "^https?://", with: "", options: .regularExpression)
+            baseURLString = "\(cleaned)\(portPart)"
+        }
+    }
+
+    /// Port portion of the server URL. Defaults to "8642".
+    var port: String {
+        get {
+            let trimmed = baseURLString
+                .replacingOccurrences(of: "^https?://", with: "", options: .regularExpression)
+            // Find last colon that isn't inside brackets (IPv6)
+            if let colonRange = trimmed.range(of: ":", options: .backwards) {
+                let afterColon = trimmed[colonRange.upperBound...]
+                if !afterColon.isEmpty { return String(afterColon) }
+            }
+            return ""
+        }
+        set {
+            let hostPart = host
+            let cleaned = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if cleaned.isEmpty {
+                baseURLString = hostPart
+            } else {
+                baseURLString = "\(hostPart):\(cleaned)"
+            }
+        }
+    }
+
     /// Trim trailing slashes and validate.
     var normalizedBaseURL: URL? {
         let trimmed = baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         let stripped = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
-        guard let url = URL(string: stripped), url.scheme != nil, url.host != nil else { return nil }
+        // If no scheme, prepend http:// so URL() can parse host + port
+        let withScheme = stripped.contains("://") ? stripped : "http://\(stripped)"
+        guard let url = URL(string: withScheme), url.host != nil else { return nil }
         return url
     }
 
