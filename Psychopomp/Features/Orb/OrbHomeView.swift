@@ -199,6 +199,9 @@ struct OrbHomeView: View {
     }
 
     private var statusLabel: String {
+        if config.useAppleIntelligence && config.appleIntelligenceClient != nil {
+            return "Apple Intelligence"
+        }
         if config.selectedModel.isEmpty { return "no model" }
         let id = config.selectedModel
         return id.count > 16 ? "…" + id.suffix(14) : id

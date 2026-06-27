@@ -259,12 +259,15 @@ struct SettingsView: View {
             set: { newType in
                 config.endpointType = newType
                 config.useAppleIntelligence = (newType == .appleIntelligence)
-                // Auto-fill defaults when switching endpoints
+                // Auto-fill defaults when switching endpoints and write to config
+                // so isConfigured stays true when switching away from Apple Intelligence.
                 if newType.defaultHost != "127.0.0.1" || host == "127.0.0.1" {
                     host = newType.defaultHost
+                    config.host = newType.defaultHost
                 }
                 if newType.defaultPort != port {
                     port = newType.defaultPort
+                    config.port = newType.defaultPort
                 }
                 models = []
                 status = nil
@@ -285,9 +288,10 @@ struct SettingsView: View {
         config.host = h
         config.port = p
         config.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        if models.isEmpty {
-            config.selectedModel = manualModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
+        let model = models.isEmpty
+            ? manualModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            : config.selectedModel
+        config.selectedModel = model
     }
 
     private func testConnection() async {
