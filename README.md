@@ -1,6 +1,6 @@
 # psychopomp
 
-<img width="2048" height="2048" alt="Gemini_Generated_Image_37a8qm37a8qm37a8" src="https://github.com/user-attachments/assets/077cdfa0-f32b-45e4-b749-088f28273834" />
+<img width="1000" height="1000" alt="Gemini_Generated_Image_37a8qm37a8qm37a8" src="https://github.com/user-attachments/assets/077cdfa0-f32b-45e4-b749-088f28273834" />
 
 
 A native iOS companion for your self-hosted **[Hermes Agent](https://github.com/nousresearch/hermes-agent)**.
