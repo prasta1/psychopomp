@@ -33,10 +33,11 @@ final class AppleIntelligenceClient {
             let task = Task {
                 do {
                     let responseStream = session.streamResponse(to: prompt)
-                    // ResponseStream<String> yields the full accumulated text at each step.
+                    // Each Snapshot's `content` is the full accumulated String so far.
                     // Track the previously emitted length and emit only the new portion.
                     var previousLength = 0
-                    for try await partial in responseStream {
+                    for try await snapshot in responseStream {
+                        let partial = snapshot.content
                         if partial.count > previousLength {
                             let delta = String(partial.dropFirst(previousLength))
                             continuation.yield(.textDelta(delta))
