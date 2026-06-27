@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var port = ""
     @State private var apiKey = ""
     @State private var models: [HermesModelInfo] = []
+    @State private var manualModel = ""
     @State private var status: String?
     @State private var statusOK = true
 
@@ -48,9 +49,7 @@ struct SettingsView: View {
                 if !config.useAppleIntelligence {
                     group("Default model") {
                         if models.isEmpty {
-                            Text(config.selectedModel.isEmpty ? "Reload to fetch models" : config.selectedModel)
-                                .font(Theme.Font.sansBody)
-                                .foregroundStyle(Theme.Color.textCoolDim)
+                            field("Model ID", text: $manualModel)
                         } else {
                             Picker("Model", selection: modelSelection) {
                                 ForEach(models) { Text($0.id).tag($0.id) }
@@ -97,6 +96,7 @@ struct SettingsView: View {
             host = config.host
             port = config.port
             apiKey = config.apiKey
+            manualModel = config.selectedModel
         }
         .task {
             if !config.useAppleIntelligence { await reload() }
@@ -234,6 +234,9 @@ struct SettingsView: View {
         config.host = h
         config.port = p
         config.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if models.isEmpty {
+            config.selectedModel = manualModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
     }
 
     private func reload() async {
