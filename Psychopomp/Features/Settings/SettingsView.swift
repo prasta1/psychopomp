@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var models: [HermesModelInfo] = []
     @State private var status: String?
     @State private var statusOK = true
+    @State private var discovery = NetworkDiscovery()
 
     var body: some View {
         ScrollView {
@@ -128,6 +129,8 @@ struct SettingsView: View {
                 }
             }
 
+            discoverySection
+
             group("Model") {
                 if models.isEmpty {
                     Text("Tap \"Reload models\" to fetch available models")
@@ -141,6 +144,73 @@ struct SettingsView: View {
                     .tint(Theme.Color.aura)
                 }
             }
+        }
+    }
+
+    // MARK: - Network Discovery
+
+    @ViewBuilder
+    private var discoverySection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            HStack {
+                Text("DISCOVER".uppercased())
+                    .font(Theme.Font.sansCaption)
+                    .foregroundStyle(Theme.Color.textCoolFaint)
+                    .tracking(1.2)
+                Spacer()
+                if discovery.isScanning {
+                    ProgressView()
+                        .tint(Theme.Color.aura)
+                } else {
+                    Button {
+                        discovery.startDiscovery()
+                    } label: {
+                        Label("Scan Network", systemImage: "magnifyingglass")
+                            .font(Theme.Font.sansCaption)
+                            .foregroundStyle(Theme.Color.aura)
+                    }
+                }
+            }
+
+            if !discovery.discovered.isEmpty {
+                VStack(spacing: Theme.Spacing.sm) {
+                    ForEach(discovery.discovered) { ep in
+                        Button {
+                            host = ep.host
+                            port = String(ep.port)
+                            config.baseURLString = "\(ep.host):\(ep.port)"
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(ep.name)
+                                        .font(Theme.Font.sansBody)
+                                        .foregroundStyle(Theme.Color.textCool)
+                                    Text("\(ep.host):\(ep.port)")
+                                        .font(Theme.Font.sansCaption)
+                                        .foregroundStyle(Theme.Color.textCoolDim)
+                                }
+                                Spacer()
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(Theme.Color.aura)
+                            }
+                            .padding(Theme.Spacing.md)
+                            .background(Color.white.opacity(0.05),
+                                        in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                    .strokeBorder(Theme.Color.aura.opacity(0.35), lineWidth: 1)
+                            )
+                        }
+                    }
+                }
+            } else if !discovery.isScanning {
+                Text("Tap \"Scan Network\" to find AI servers on your local network.")
+                    .font(Theme.Font.sansCaption)
+                    .foregroundStyle(Theme.Color.textCoolFaint)
+            }
+        }
+        .onDisappear {
+            discovery.stopDiscovery()
         }
     }
 
