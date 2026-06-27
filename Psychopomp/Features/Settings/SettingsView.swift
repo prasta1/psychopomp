@@ -303,6 +303,7 @@ struct SettingsView: View {
             if ok {
                 statusOK = true
                 status = "Connected"
+                await reloadModels()
             } else {
                 statusOK = false
                 status = "Server responded but health check failed"
