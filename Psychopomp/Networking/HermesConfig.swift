@@ -1,6 +1,51 @@
 import Foundation
 import SwiftUI
 
+/// Which AI backend the user is connecting to.
+enum EndpointType: String, CaseIterable, Identifiable {
+    case lmStudio, ollama, tailscale, appleIntelligence
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .lmStudio: return "LM Studio"
+        case .ollama: return "Ollama"
+        case .tailscale: return "Tailscale / Custom"
+        case .appleIntelligence: return "Apple Intelligence"
+        }
+    }
+
+    var defaultPort: String {
+        switch self {
+        case .lmStudio: return "1234"
+        case .ollama: return "11434"
+        case .tailscale: return "8642"
+        case .appleIntelligence: return ""
+        }
+    }
+
+    var defaultHost: String {
+        switch self {
+        case .lmStudio, .ollama: return "127.0.0.1"
+        case .tailscale: return ""
+        case .appleIntelligence: return ""
+        }
+    }
+
+    /// Whether this endpoint needs an API key field.
+    var showsAPIKey: Bool {
+        switch self {
+        case .lmStudio, .ollama: return false
+        case .tailscale: return true
+        case .appleIntelligence: return false
+        }
+    }
+
+    /// Whether this endpoint is server-based (vs on-device).
+    var isServerBased: Bool { self != .appleIntelligence }
+}
+
 /// Holds connection settings and AI provider selection.
 /// Base URL and selected model are non-secret and persist in UserDefaults;
 /// the API key lives in the Keychain.
@@ -12,6 +57,11 @@ final class HermesConfig {
 
     var selectedModel: String {
         didSet { UserDefaults.standard.set(selectedModel, forKey: Keys.model) }
+    }
+
+    /// The user's chosen endpoint type. Persisted.
+    var endpointType: EndpointType {
+        didSet { UserDefaults.standard.set(endpointType.rawValue, forKey: Keys.endpointType) }
     }
 
     /// When true, the on-device Apple Intelligence model is used instead of the
@@ -28,7 +78,6 @@ final class HermesConfig {
                         return
                     }
                 }
-                // Apple Intelligence unavailable — leave the flag set but clear the client.
                 appleIntelligenceClient = nil
             } else {
                 appleIntelligenceClient = nil
@@ -57,6 +106,10 @@ final class HermesConfig {
         self.baseURLString = UserDefaults.standard.string(forKey: Keys.baseURL) ?? ""
         self.apiKey = Keychain.read() ?? ""
 
+        // Restore endpoint type.
+        let savedEndpoint = UserDefaults.standard.string(forKey: Keys.endpointType)
+        self.endpointType = savedEndpoint.flatMap(EndpointType.init(rawValue:)) ?? .lmStudio
+
         // Determine Apple Intelligence availability and set up the client.
         var aiClient: AnyObject? = nil
         var useAI = false
@@ -65,20 +118,19 @@ final class HermesConfig {
             if client.isAvailable {
                 aiClient = client
                 let saved = UserDefaults.standard.object(forKey: Keys.useAppleIntelligence) as? Bool
-                useAI = saved ?? true   // Default: enabled when Apple Intelligence is present
+                useAI = saved ?? true
             }
         }
         self.useAppleIntelligence = useAI
         self.appleIntelligenceClient = aiClient
 
-        // Select a default model for display.
         let savedModel = UserDefaults.standard.string(forKey: Keys.model)
         if let savedModel, !savedModel.isEmpty {
             self.selectedModel = savedModel
         } else if useAI {
             self.selectedModel = "Apple Intelligence"
         } else {
-            self.selectedModel = "nousresearch/hermes-4-70b"
+            self.selectedModel = ""
         }
     }
 
@@ -94,7 +146,6 @@ final class HermesConfig {
             let trimmed = baseURLString
                 .replacingOccurrences(of: "^https?://", with: "", options: .regularExpression)
             if let colonRange = trimmed.range(of: ":", options: .backwards) {
-                // Could be host:port or [ipv6]:port — strip port
                 let candidate = String(trimmed[..<colonRange.lowerBound])
                 return candidate.hasPrefix("[") && candidate.hasSuffix("]")
                     ? String(candidate.dropFirst().dropLast())
@@ -110,12 +161,11 @@ final class HermesConfig {
         }
     }
 
-    /// Port portion of the server URL. Defaults to "8642".
+    /// Port portion of the server URL.
     var port: String {
         get {
             let trimmed = baseURLString
                 .replacingOccurrences(of: "^https?://", with: "", options: .regularExpression)
-            // Find last colon that isn't inside brackets (IPv6)
             if let colonRange = trimmed.range(of: ":", options: .backwards) {
                 let afterColon = trimmed[colonRange.upperBound...]
                 if !afterColon.isEmpty { return String(afterColon) }
@@ -138,7 +188,6 @@ final class HermesConfig {
         let trimmed = baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         let stripped = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
-        // If no scheme, prepend http:// so URL() can parse host + port
         let withScheme = stripped.contains("://") ? stripped : "http://\(stripped)"
         guard let url = URL(string: withScheme), url.host != nil else { return nil }
         return url
@@ -148,5 +197,6 @@ final class HermesConfig {
         static let baseURL = "hermes.baseURL"
         static let model = "hermes.model"
         static let useAppleIntelligence = "hermes.useAppleIntelligence"
+        static let endpointType = "hermes.endpointType"
     }
 }
