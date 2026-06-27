@@ -3,12 +3,13 @@ import SwiftData
 
 /// The swipe-up history sheet. Lists past conversations; lets the user continue one
 /// by voice (`onSelect`), open its full transcript (`onOpen`), start a new session
-/// (`onNew`), or delete.
+/// (`onNew`), re-send the last message (`onResend`), or delete.
 struct RecentSessionsSheet: View {
     let current: Conversation?
     let onSelect: (Conversation) -> Void
     let onOpen: (Conversation) -> Void
     let onNew: () -> Void
+    let onResend: (Conversation) -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -72,6 +73,15 @@ struct RecentSessionsSheet: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Open full transcript")
+
+            if let lastUserMsg = convo.orderedMessages.last(where: { $0.role == .user }) {
+                Button { onResend(convo) } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .foregroundStyle(Theme.Color.aura)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Re-send last message")
+            }
         }
         .padding(.vertical, Theme.Spacing.xs)
     }

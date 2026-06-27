@@ -51,7 +51,13 @@ struct OrbHomeView: View {
                     current: conversation,
                     onSelect: { select($0) },
                     onOpen: { showRecent = false; path.append($0) },
-                    onNew: { startNewSession() }
+                    onNew: { startNewSession() },
+                    onResend: { convo in
+                        showRecent = false
+                        if let lastMsg = convo.orderedMessages.last(where: { $0.role == .user }) {
+                            sendText(lastMsg.text)
+                        }
+                    }
                 )
             }
             .sheet(isPresented: $showSettings) {
