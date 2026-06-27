@@ -26,6 +26,9 @@ struct OrbHomeView: View {
     @State private var models: [HermesModelInfo] = []
     /// Whether the last Hermes model fetch succeeded (drives the status dot).
     @State private var reachable = false
+    /// Set when the user releases the orb before recording has started; the send
+    /// fires as soon as `recorder.isRecording` becomes true.
+    @State private var pendingSendAfterRecord = false
     @FocusState private var typing: Bool
     /// Icon-button sizes that grow with Dynamic Type so glyphs and hit-targets scale together.
     @ScaledMetric private var iconButtonSize: CGFloat = 38
@@ -66,6 +69,12 @@ struct OrbHomeView: View {
             .task { await loadModels() }
             .onChange(of: recorder.transcript) { _, new in
                 if recorder.isRecording { liveTranscript = new }
+            }
+            .onChange(of: recorder.isRecording) { _, recording in
+                if recording && pendingSendAfterRecord {
+                    pendingSendAfterRecord = false
+                    stopAndSend()
+                }
             }
             .onChange(of: pendingAction) { _, action in
                 guard let action else { return }
@@ -387,12 +396,22 @@ struct OrbHomeView: View {
         liveTranscript = ""
         Task {
             let granted = await VoiceRecorder.requestAuthorization()
-            guard granted else { permissionDenied = true; isLocked = false; return }
+            guard granted else {
+                permissionDenied = true
+                isLocked = false
+                pendingSendAfterRecord = false
+                return
+            }
             try? await recorder.start()
         }
     }
 
     private func stopAndSend() {
+        // If recording hasn't started yet (async auth in progress), defer the send.
+        guard recorder.isRecording else {
+            pendingSendAfterRecord = true
+            return
+        }
         let final = recorder.stop().trimmingCharacters(in: .whitespacesAndNewlines)
         liveTranscript = ""
         guard !final.isEmpty else { return }
