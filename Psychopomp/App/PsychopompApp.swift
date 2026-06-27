@@ -5,6 +5,7 @@ import SwiftData
 struct PsychopompApp: App {
     @State private var config = HermesConfig()
     @State private var theme = ThemeManager.shared
+    @State private var pendingAction: IntentAction?
 
     /// Shared SwiftData stack for conversations, messages, tool events, attachments.
     let modelContainer: ModelContainer = {
@@ -19,11 +20,16 @@ struct PsychopompApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            RootView(pendingAction: $pendingAction)
                 .environment(config)
                 .environment(theme)
                 .preferredColorScheme(theme.palette.colorScheme)
                 .tint(Theme.Color.accent)
+                .onReceive(NotificationCenter.default.publisher(for: .actionButtonTriggered)) { notification in
+                    if let action = notification.userInfo?["mode"] as? IntentAction {
+                        pendingAction = action
+                    }
+                }
         }
         .modelContainer(modelContainer)
     }
@@ -33,12 +39,13 @@ struct PsychopompApp: App {
 /// connection has been configured.
 struct RootView: View {
     @Environment(HermesConfig.self) private var config
+    @Binding var pendingAction: IntentAction?
     @State private var connected = false
 
     var body: some View {
         Group {
             if config.isConfigured || connected {
-                OrbHomeView()
+                OrbHomeView(pendingAction: $pendingAction)
             } else {
                 ConnectionView { connected = true }
             }

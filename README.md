@@ -11,6 +11,8 @@ tool-progress, and is styled after Nous Research's retro-terminal aesthetic.
 
 - **Streaming chat** against your Hermes agent via the Runs API (with automatic
   fallback to `/v1/chat/completions`).
+- **Multiple AI providers** — connect to Hermes, LM Studio, Ollama, custom
+  OpenAI-compatible endpoints, or use **Apple Intelligence** on-device (iOS 26+).
 - **Live tool-progress timeline** — see the agent's terminal / web / file steps inline.
 - **Stop** a run mid-flight, and resolve **approval gates** for sensitive tools.
 - **Model picker** populated from `GET /v1/models`.
@@ -18,13 +20,20 @@ tool-progress, and is styled after Nous Research's retro-terminal aesthetic.
 - **Image input** — attach photos, sent inline to multimodal Hermes.
 - **Local history** — conversations persist on-device (SwiftData). Each thread
   carries a stable `X-Hermes-Session-Key` so agent memory stays per-conversation.
+- **Action Button** (iPhone 15 Pro+) — trigger a voice conversation or open the
+  keyboard directly from the Action Button via App Intents. Also available as
+  Siri Shortcuts.
+- **Voice input** — hold the orb to talk, release to send. Tap to latch
+  hands-free listening.
 - **Dark, terminal-first** design; the API key is stored in the iOS Keychain.
 
 ## Requirements
 
 - **Xcode 16+** (the project uses a file-system–synchronized group, `objectVersion 77`).
 - **iOS 17+** target (SwiftData, the Observation framework, `PhotosPicker`).
-- A running **hermes-agent** with its API server enabled.
+- **iOS 18+** for Action Button integration.
+- **iOS 26+** for Apple Intelligence on-device support.
+- A running **hermes-agent** with its API server enabled (or use Apple Intelligence).
 
 ## Run your Hermes agent
 
@@ -54,7 +63,20 @@ open Psychopomp.xcodeproj
    defaults to `com.psychopomp.hermes` — change it to something under your team.
 3. Build & Run.
 4. On first launch, enter the **server URL** and **API key**, tap **Test connection**,
-   then **Connect**.
+   then **Connect**. Or select **Apple Intelligence** as the provider for
+   on-device inference (iOS 26+).
+
+## Action Button (iPhone 15 Pro+)
+
+Once installed, you can assign Psychopomp to the Action Button:
+
+1. Open **Settings > Action Button**.
+2. Scroll to the **Controls** section.
+3. Select **"Start Voice Conversation"** or **"Type a Message"**.
+4. Press the Action Button to trigger it.
+
+The intents also appear in the **Shortcuts** app for custom automations
+(e.g. "Talk to Psychopomp" via Siri).
 
 ## Project layout
 
@@ -62,9 +84,10 @@ open Psychopomp.xcodeproj
 Psychopomp/
 ├─ App/            PsychopompApp (entry, SwiftData container), Info.plist
 ├─ DesignSystem/   Theme tokens, terminal text styles, shared components
+├─ Intents/        AppIntents for Action Button & Siri Shortcuts
 ├─ Models/         Conversation, ChatMessage, ToolEvent, Attachment (SwiftData)
 ├─ Networking/     HermesClient, HermesConfig, Keychain, SSEParser, RunEvent, JSON
-└─ Features/       Connection · Conversations · Chat (+ ViewModel) · Settings
+└─ Features/       Connection · Orb · Chat (+ ViewModel) · Settings
 ```
 
 ## Notes on the Hermes API surface

@@ -7,6 +7,7 @@ import SwiftData
 struct OrbHomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(HermesConfig.self) private var config
+    @Binding var pendingAction: IntentAction?
 
     /// The conversation the orb is currently bound to (continued across turns).
     @State private var conversation: Conversation?
@@ -59,6 +60,19 @@ struct OrbHomeView: View {
             .task { await loadModels() }
             .onChange(of: recorder.transcript) { _, new in
                 if recorder.isRecording { liveTranscript = new }
+            }
+            .onChange(of: pendingAction) { _, action in
+                guard let action else { return }
+                pendingAction = nil
+                switch action {
+                case .voiceConversation:
+                    isLocked = true
+                    startListening()
+                case .typedMessage:
+                    permissionDenied = false
+                    showKeyboard = true
+                    typing = true
+                }
             }
         }
         .tint(Theme.Color.aura)
