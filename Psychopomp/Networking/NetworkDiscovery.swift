@@ -1,4 +1,5 @@
 import Foundation
+@preconcurrency import Dispatch
 @preconcurrency import Network
 
 /// Discovers AI model servers on the local network via mDNS (Bonjour) and
@@ -98,8 +99,8 @@ final class NetworkDiscovery: ObservableObject {
                         switch endpointHost {
                         case .ipv4(let addr): hostStr = "\(addr)"
                         case .ipv6(let addr): hostStr = "\(addr)"
-                        @unknown default:
-                            break
+                        case .name: break
+                        @unknown default: break
                         }
                         if !hostStr.isEmpty {
                             let capturedName = name
@@ -111,6 +112,8 @@ final class NetworkDiscovery: ObservableObject {
                     }
                     connection.cancel()
                     continuation.resume()
+                case .setup, .preparing:
+                    break
                 case .waiting, .failed, .cancelled:
                     continuation.resume()
                 @unknown default:
@@ -188,7 +191,7 @@ final class NetworkDiscovery: ObservableObject {
             case .ready:
                 DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { conn.cancel() }
                 self.httpProbe(host: hostCaptured, port: portCaptured, name: nameCaptured) { conn.cancel() }
-            case .waiting, .failed, .cancelled:
+            case .setup, .preparing, .waiting, .failed, .cancelled:
                 break
             @unknown default:
                 break
